@@ -110,6 +110,7 @@ species coordinator{
 		}
 		if !(b.name in scheduling){
 			scheduling <- scheduling + b.name;
+			write b.name;
 		}
 	}
 	
@@ -160,6 +161,7 @@ species coordinator{
 	reflex new_tick when: started{
 
 		list<human> pop <- get_all_instances(human);	
+		write pop;
 
 		loop bloc_name over: scheduling{ // move to next tick for all blocs, following the defined scheduling
 			if bloc_name in registered_blocs.keys{
