@@ -201,6 +201,47 @@ species transport parent:bloc{
 	}
 }
 
+species taxis parent:transport_mode {
+	init{
+		type <- "taxis";
+		number_available <- 1000; // TODO : remplacer par le vrai nombre national
+		create taxi_vehicle;
+	}
+}
+
+species trains parent:transport_mode {
+	init{
+		type <- "trains";
+		number_available <- 1000; // TODO : remplacer par le vrai nombre national
+		create train_vehicle;
+	}
+}
+
+species minibuses parent:transport_mode {
+	init{
+		type <- "minibuses";
+		number_available <- 1000; // TODO : remplacer par le vrai nombre national
+		create minibus_vehicle;
+	}
+}
+
+species bikes parent:transport_mode {
+	init{
+		type <- "bikes";
+		number_available <- 1000; // TODO : remplacer par le vrai nombre national
+		create bike_vehicle;
+	}
+}
+
+species trucks parent:transport_mode {
+	init{
+		type <- "trucks";
+		number_available <- 1000; // TODO : remplacer par le vrai nombre national
+		create truck_vehicle;
+	}
+}
+
+
 /**
  * We define here the experiment and the displays related to transport. 
  * We will then be able to run this experiment from the Main code of the simulation, with all the blocs connected.
