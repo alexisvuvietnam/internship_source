@@ -68,7 +68,6 @@ species agricultural parent:bloc{
 	}
 	
 	action tick(list<human> pop) {
-		write "tick";
 		do collect_last_tick_data();
 		do population_activity(pop);
 	}
