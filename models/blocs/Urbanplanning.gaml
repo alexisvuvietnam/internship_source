@@ -13,14 +13,16 @@ import "../API/API.gaml"
 global {
 	/* Setup */
 	// TODO : adapter les productions et les ressources demandées sur les vrais variables et valeurs
-	list<string> production_inputs_U <- ["kg plastic", "kg wood"];
+	list<string> production_inputs_U <- ["kg_plastic", "kg_wood"];
 	list<string> production_outputs_U <- ["house"];
 	list<string> production_emissions_U <- ["gCO2e emissions"];
 	
 	/* Production data */
 	// TODO : adapter les production et le cout de celle ci sur les bonnes
-//	map<string, map<string, float>> production_outputs_inputs_T <- ["house" :: ["kg wood" :: 0.0, "kg plastic" :: 0.0]];
-//	map<string, map<string, float>> production_output_emissions_T <- ["house" :: ["gCO2e emissions" :: 0.0]];
+	map<string, map<string, float>> production_output_inputs_U <- ["house" :: ["kg_wood" :: 0.0, "kg_plastic" :: 3000.0]];
+	map<string, map<string, float>> production_output_emissions_U <- ["house" :: ["gCO2e emissions" :: 1000000.0]];
+	
+	map<string, float> indivudual_consumption_U <- ["house"::1.0];
 	
 	/* Counters & Stats */
 	map<string, float> tick_production_U <- [];
@@ -148,16 +150,17 @@ species urbanplanning parent:bloc{
 		
 		bool produce(map<string,float> demand){ // apply the input
 			// TODO : la production concernera ici la création de nouvau véhicule
-//			loop c over: demand.keys{
-//				loop u over: production_inputs_U{  // needs (resources consumed/emitted) for this demand
-//					tick_resources_used[u] <- tick_resources_used[u] + production_output_inputs_T[c][u] * demand[c];
-//				}
-//				loop e over: production_emissions_U{ // apply emissions
-//					float quantity_emitted <- production_output_emissions_T[c][e] * demand[c];
-//					tick_emissions[e] <- tick_emissions[e] + quantity_emitted;
-//				}
-//				tick_production[c] <- tick_production[c] + demand[c];
-//			}
+			loop c over: demand.keys{
+				loop u over: production_inputs_U{  // needs (resources consumed/emitted) for this demand
+					float quantity_needed <- production_output_inputs_U[c][u] * demand[c]; // quantify the resources consumed/emitted by this demand
+					tick_resources_used[u] <- tick_resources_used[u] + quantity_needed;
+				}
+				loop e over: production_emissions_U{ // apply emissions
+					float quantity_emitted <- production_output_emissions_U[c][e] * demand[c];
+					tick_emissions[e] <- tick_emissions[e] + quantity_emitted;
+				}
+				tick_production[c] <- tick_production[c] + demand[c];
+			}
 			return true; // always return 'ok' signal
 		}
 		
@@ -191,8 +194,9 @@ species urbanplanning parent:bloc{
 		}
 		
 		action consume(human h){
-		    string choice <- one_of(production_outputs_U); // note : here, there is only one production, energy
-			// consumed[choice] <- consumed[choice]+rnd(min_kWh_conso, max_kWh_conso);
+		    loop c over: indivudual_consumption_U.keys{
+		    	consumed[c] <- consumed[c]+indivudual_consumption_U[c];
+		    }
 		}
 	}
 }
