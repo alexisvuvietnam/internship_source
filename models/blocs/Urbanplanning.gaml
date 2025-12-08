@@ -23,12 +23,15 @@ global {
 	map<string, map<string, float>> production_output_emissions_U <- ["house" :: ["gCO2e emissions" :: 1000000.0]];
 	
 	map<string, float> indivudual_consumption_U <- ["house"::1.0];
+	map<string, float> supplies_U <- ["house"::0.0];
+	map<string, float> time_cost_U <- ["house"::3.0];
 	
 	/* Counters & Stats */
 	map<string, float> tick_production_U <- [];
 	map<string, float> tick_pop_consumption_U <- [];
 	map<string, float> tick_resources_used_U <- [];
 	map<string, float> tick_emissions_U <- [];
+	map<string, list<float>> production_history_U <- production_outputs_U accumulate each::list<float>([]);
 	
 	init{ // a security added to avoid launching an experiment without the other blocs
 		if (length(coordinator) = 0){
@@ -56,6 +59,7 @@ species urbanplanning parent:bloc{
 		create urban_consumer number:1 returns:consumers;
 		producer <- first(producers);
 		consumer <- first(consumers);
+		
 	}
 	
 	action tick(list<human> pop){
@@ -88,6 +92,10 @@ species urbanplanning parent:bloc{
 	    	tick_production_U <- producer.get_tick_outputs_produced(); // collect production
 	    	tick_emissions_U <- producer.get_tick_emissions(); // collect emissions
     	
+			//loop c over: production_outputs_U{
+            //    production_history_U[c] <- production_history_U[c] + [tick_production_U[c]];
+            //}
+    	
 	    	ask urban_consumer{ // prepare next tick on consumer side
 	    		do reset_tick_counters;
 	    	}
@@ -110,7 +118,7 @@ species urbanplanning parent:bloc{
     			loop c over: myself.consumed.keys{
 		    		do produce([c::myself.consumed[c]]);
 		    	}
-		    } 
+		    }
     	}
     }
 
@@ -150,7 +158,15 @@ species urbanplanning parent:bloc{
 		
 		bool produce(map<string,float> demand){ // apply the input
 			// TODO : la production concernera ici la création de nouvau véhicule
+			
 			loop c over: demand.keys{
+				write demand[c];
+				write supplies_U[c];
+				write "";
+				demand[c] <- demand[c] - supplies_U[c];
+				if(demand[c] < 0){
+					demand[c] <- 0;
+				}
 				loop u over: production_inputs_U{  // needs (resources consumed/emitted) for this demand
 					float quantity_needed <- production_output_inputs_U[c][u] * demand[c]; // quantify the resources consumed/emitted by this demand
 					tick_resources_used[u] <- tick_resources_used[u] + quantity_needed;
@@ -160,6 +176,16 @@ species urbanplanning parent:bloc{
 					tick_emissions[e] <- tick_emissions[e] + quantity_emitted;
 				}
 				tick_production[c] <- tick_production[c] + demand[c];
+				
+				write tick_production[c];
+				
+				supplies_U[c] <- supplies_U[c] + tick_production[c];
+				
+				//write production_history_U[c];
+	    		//production_history_U[c][cycle] <- tick_production[c];
+	    		//write get_past_production(c);
+				
+				
 			}
 			return true; // always return 'ok' signal
 		}
@@ -176,6 +202,7 @@ species urbanplanning parent:bloc{
 	 */
 	species urban_consumer parent:consumption_agent{
 		map<string, float> consumed <- [];
+		map<string, float> possession <- [];
 		
 		map<string, float> get_tick_consumption{
 			return copy(consumed);
@@ -184,6 +211,7 @@ species urbanplanning parent:bloc{
 		init{
 			loop c over: production_outputs_U{
 				consumed[c] <- 0;
+				possession[c] <- 0;
 			}
 		}
 		
@@ -195,8 +223,9 @@ species urbanplanning parent:bloc{
 		
 		action consume(human h){
 		    loop c over: indivudual_consumption_U.keys{
-		    	consumed[c] <- consumed[c]+indivudual_consumption_U[c];
+				consumed[c] <- consumed[c]+indivudual_consumption_U[c];
 		    }
+
 		}
 	}
 }
