@@ -20,8 +20,9 @@ global{
 	
 	/* Production data */
 	map<string, map<string, float>> production_output_inputs_A <- [
-		"kg_meat"::["L water"::2500.0, "kWh energy"::450.0, "m² land"::500.0, "gCO2e emissions"::3500.0],
-		"kg_vegetables"::["L water"::900.0, "kWh energy"::175.0, "m² land"::100.0, "gCO2e emissions"::1000.0]
+		"kg_meat"::["L water"::550.0, "kWh energy"::6.31, "m² land"::25.0, "gCO2e emissions"::9000.0],
+		"kg_vegetables"::["L water"::322.0, "kWh energy"::0.86, "m² land"::0.6, "gCO2e emissions"::210.0]
+		//"kg_vegetables"::["L water"::211.5, "kWh energy"::175.0, "m² land"::0.47, "gCO2e emissions"::2.256]
 	]; // Note : this is fake data (not the real amound of resources used and emitted)
 	map<string, map<string, float>> production_output_emissions_A <- [
 		"kg_meat"::["gCO2e emissions"::3500.0],
@@ -30,7 +31,7 @@ global{
 	
 	
 	/* Consumption data */
-	map<string, float> indivudual_consumption_A <- ["kg_meat"::5.2, "kg_vegetables"::12.5]; // monthly consumption per individual of the population. Note : this is fake data.
+	map<string, float> indivudual_consumption_A <- ["kg_meat"::2, "kg_vegetables"::15]; // monthly consumption per individual of the population. Note : this is fake data.
 	
 	/* Counters & Stats */
 	map<string, float> tick_production_A <- [];
