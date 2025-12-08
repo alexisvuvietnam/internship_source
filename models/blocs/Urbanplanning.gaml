@@ -160,9 +160,6 @@ species urbanplanning parent:bloc{
 			// TODO : la production concernera ici la création de nouvau véhicule
 			
 			loop c over: demand.keys{
-				write demand[c];
-				write supplies_U[c];
-				write "";
 				demand[c] <- demand[c] - supplies_U[c];
 				if(demand[c] < 0){
 					demand[c] <- 0;
@@ -176,8 +173,6 @@ species urbanplanning parent:bloc{
 					tick_emissions[e] <- tick_emissions[e] + quantity_emitted;
 				}
 				tick_production[c] <- tick_production[c] + demand[c];
-				
-				write tick_production[c];
 				
 				supplies_U[c] <- supplies_U[c] + tick_production[c];
 				
