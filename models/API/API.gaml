@@ -175,8 +175,72 @@ species coordinator{
 	}
 }
 
-/* Territory species (used to represent GIS elements) */
+/* Global species for agregating stats */
 
+species vehicle {
+	string name;
+	float consumption_per_km;
+	float avg_speed; //km_per_hour
+	int max_passenger_capacity <- 0;
+	float max_delivery_capacity <- 0.0;
+	float fabrication_cost;
+}
+
+species taxi_vehicle parent:vehicle {
+	init {
+		name <- "taxi_vehicle";
+		consumption_per_km <- 16.0; // TODO : modifier avec vrai données
+		avg_speed <- 110.0; // TODO : modifier avec vrai données
+		max_passenger_capacity <- 4;
+	}
+}
+species train_vehicle parent:vehicle {
+	init {
+		name <- "train_vehicle";
+		consumption_per_km <- 16.0; // TODO : modifier avec vrai données
+		avg_speed <- 160.0; // TODO : modifier avec vrai données
+		max_passenger_capacity <- 0;
+	}
+}
+species minibus_vehicle parent:vehicle {
+	init {
+		name <- "minibus_vehicle";
+		consumption_per_km <- 16.0; // TODO : modifier avec vrai données
+		avg_speed <- 50.0; // TODO : modifier avec vrai données
+		max_passenger_capacity <- 50; // TODO : modifier avec vrai données
+	}
+}
+
+species bike_vehicle parent:vehicle {
+	init {
+		name <- "bike_vehicle";
+		consumption_per_km <- 0.0;
+		avg_speed <- 15.0; // TODO : modifier avec vrai données
+		max_passenger_capacity <- 1; // TODO : modifier avec vrai données
+	}
+}
+
+species truck_vehicle parent:vehicle {
+	init {
+		name <- "truck_vehicle";
+		consumption_per_km <- 16.0; // TODO : modifier avec vrai données
+		avg_speed <- 80.0; // modifier avec vrai données
+		max_delivery_capacity <- 0.0; //
+	}
+}
+
+species transport_mode {
+	string type; // truck, taxi, train ...
+	int number_available;
+	vehicle ref_vehicle;
+	
+	action update_number_available(int new_number){
+		number_available <- new_number;
+	}
+}
+ 
+
+/* Territory species (used to represent GIS elements) */
 species fronteers {
 	string type; 
 	rgb color <- #whitesmoke;
