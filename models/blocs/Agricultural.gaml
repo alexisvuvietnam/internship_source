@@ -21,12 +21,13 @@ global{
 	/* Production data */
 	map<string, map<string, float>> production_output_inputs_A <- [
 		"kg_meat"::["L water"::550.0, "kWh energy"::6.31, "m² land"::25.0, "gCO2e emissions"::9000.0],
-		"kg_vegetables"::["L water"::322.0, "kWh energy"::0.86, "m² land"::0.6, "gCO2e emissions"::210.0]
-		//"kg_vegetables"::["L water"::211.5, "kWh energy"::175.0, "m² land"::0.47, "gCO2e emissions"::2.256]
+		"kg_vegetables"::["L water"::322.0, "kWh energy"::0.86, "m² land"::0.6, "gCO2e emissions"::210.0],
+		"kg_coton"::["L water"::6000.0, "kWh energy"::0.5, "m² land"::15.0, "gCO2e emissions"::6600.0]
 	]; // Note : this is fake data (not the real amound of resources used and emitted)
 	map<string, map<string, float>> production_output_emissions_A <- [
-		"kg_meat"::["gCO2e emissions"::3500.0],
-		"kg_vegetables"::["gCO2e emissions"::1000.0]
+		"kg_meat"::["gCO2e emissions"::9000.0],
+		"kg_vegetables"::["gCO2e emissions"::210.0],
+		"kg_coton"::["gCO2e emissions"::6600.0]
 	]; // Note : this is fake data (not the real amound of resources used and emitted)
 	
 	
