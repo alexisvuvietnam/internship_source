@@ -76,6 +76,125 @@ species human{
 	map<string,string> additional_attributes <- [];														
 }
 
+/*
+ * Species of a main_city representing a main city of France (one of the cities given in the file 'cities_france.shp'
+ * It serves as a point of referencefor the placement of a constellations of mini-cities around it 
+ */
+species main_city {
+    string city_name;
+    int city_population;
+    list<mini_city> mini_cities_list;
+    
+    action generate_mini_cities(int nb_mini_cities_per_city, float mini_city_distance_from_center) {
+        loop i from: 0 to: nb_mini_cities_per_city - 1 {
+            // Angle evenly spaced around the center 
+            // TODO : changer le placement des villes pour un placement aléatoire dans un rayon
+            float angle <- i * (360.0 / nb_mini_cities_per_city);
+            
+            // Position with small random noise
+            float distance <- mini_city_distance_from_center * (0.8 + rnd(0.4));
+            float angle_noise <- angle + rnd(-15.0, 15.0);
+            
+            point offset <- {
+                distance * cos(angle_noise),
+                distance * sin(angle_noise)
+            };
+            
+            point mini_city_location <- location + offset;
+            
+            create mini_city {
+                name <- myself.city_name + "_MC" + i;
+                location <- mini_city_location;
+                parent_city <- myself; //reference to its parent
+                zone_radius <- 1#km; // radius of mini-cities
+                add self to: myself.mini_cities_list;
+            }
+        }
+    }
+    // --- GIS
+    aspect default {
+        draw circle(1000) color: #darkgray border: #black;
+        draw city_name color: #black size: 16 font: font("Arial", 16, #bold) 
+            at: location + {0, -1200};
+    }
+}
+
+
+/* 
+ * Species of mini-city created from a main city of France (metropolitan)
+ * it possesses a reference to its parent city, which is taken as a point of reference to place major
+ * transport axes later on
+ */
+species mini_city {
+    string name;
+    main_city parent_city;
+    float zone_radius;
+    int population;
+    list<mini_city> connected_mini_cities;
+    
+    // --- GIS
+    int degree update: length(connected_mini_cities);
+    aspect default {
+        // color variation depending on connectivity
+        rgb node_color <- rgb(
+            255 - min([255, degree * 30]),
+            100 + min([155, degree * 20]),
+            100
+        );
+        draw circle(zone_radius) color: node_color border: #black;
+        draw name color: #black size: 10 at: location + {0, zone_radius + 100};
+    }
+    
+    aspect degree {
+        draw circle(zone_radius) color: #white border: #black;
+        draw string(degree) color: #black size: 14 font: font("Arial", 14, #bold);
+    }
+}
+
+/*
+ * Species used for the generation of cities and mini-cities
+ */
+species cities{
+	file shape_file_cities;
+	geometry shape;
+	// Parameters for city generation asked to user :
+	int population_size; // number of people in the simulation
+	int number_of_mini_cities; // number of mini-cities
+	int city_population; // number of people per constellations of mini-cities
+	
+	int number_of_cities;
+	int nb_mini_cities_per_city;
+	int mini_city_population <- 10000; // population of a mini-city (10000 by default according to CDC)
+	
+	list<mini_city> mini_cities; // list of all mini-cities
+	list<main_city> main_cities; // list of all main-cities
+	
+	float mini_city_distance_from_center <- 2.0 #km;
+	
+	init{
+		// 1. create cities (mini-city constellations)
+        create main_city from: shape_file_cities with: [
+            city_name::read("name"),
+            city_population::city_population
+        ];
+        main_cities <- list(main_city);
+        number_of_cities <- length(main_city);
+        nb_mini_cities_per_city <- int(city_population/mini_city_population);
+
+        // 2. create mini-cities around each constellations
+        ask main_city {
+            do generate_mini_cities(myself.nb_mini_cities_per_city, myself.mini_city_distance_from_center);
+        }
+        mini_cities <- list(mini_city);
+        write mini_cities;
+	}
+	list<mini_city> get_mini_cities{
+		return mini_cities;
+	}
+	list<main_city> get_main_cities{
+		return main_cities;
+	}
+}
 
 /* 
  * Species used to implement the coordinator agent of the simulation.
@@ -176,7 +295,9 @@ species coordinator{
 }
 
 /* Global species for agregating stats */
-
+/*
+ * VEHICLE REFERENCES FOR CALCULATIONS
+ */
 species vehicle {
 	string name;
 	float consumption_per_km;
@@ -185,7 +306,6 @@ species vehicle {
 	float max_delivery_capacity <- 0.0;
 	float fabrication_cost;
 }
-
 species taxi_vehicle parent:vehicle {
 	init {
 		name <- "taxi_vehicle";
@@ -210,7 +330,6 @@ species minibus_vehicle parent:vehicle {
 		max_passenger_capacity <- 50; // TODO : modifier avec vrai données
 	}
 }
-
 species bike_vehicle parent:vehicle {
 	init {
 		name <- "bike_vehicle";
@@ -219,7 +338,6 @@ species bike_vehicle parent:vehicle {
 		max_passenger_capacity <- 1; // TODO : modifier avec vrai données
 	}
 }
-
 species truck_vehicle parent:vehicle {
 	init {
 		name <- "truck_vehicle";
@@ -229,6 +347,9 @@ species truck_vehicle parent:vehicle {
 	}
 }
 
+/* Species of transportation modes, used to update the number of available vehicles
+ * and to agregate stats
+ */
 species transport_mode {
 	string type; // truck, taxi, train ...
 	int number_available;

@@ -5,7 +5,6 @@
 * Tags: 
 */
 
-
 model Transport
 import "../API/API.gaml"
 
@@ -17,14 +16,14 @@ global {
 	
 	/* Production data */
 	// TODO : concerne les fabrication de nouveaux véhicules
-//	map<string, map<string, float>> production_outputs_inputs_T <-
-//	["minibus" :: ["kWh energy" :: 0.0, "kg plastic" :: 0.0],  
-//	"train" :: ["kWh energy" :: 0.0, "kg plastic" :: 0.0],
-//	"taxi" :: ["kWh energy" :: 0.0, "kg plastic" :: 0.0]];
-//	map<string, map<string, float>> production_output_emissions_T <- 
-//	["minibus" :: ["gCO2e emissions" :: 0.0],
-//	"train" :: ["gCO2e emissions" :: 0.0],
-//	"taxi" :: ["gCO2e emissions" :: 0.0]];
+	//	map<string, map<string, float>> production_outputs_inputs_T <-
+	//	["minibus" :: ["kWh energy" :: 0.0, "kg plastic" :: 0.0],  
+	//	"train" :: ["kWh energy" :: 0.0, "kg plastic" :: 0.0],
+	//	"taxi" :: ["kWh energy" :: 0.0, "kg plastic" :: 0.0]];
+	//	map<string, map<string, float>> production_output_emissions_T <- 
+	//	["minibus" :: ["gCO2e emissions" :: 0.0],
+	//	"train" :: ["gCO2e emissions" :: 0.0],
+	//	"taxi" :: ["gCO2e emissions" :: 0.0]];
 	
 	/* Counters & Stats */
 	map<string, float> tick_production_T <- [];
@@ -47,7 +46,6 @@ global {
  */
 species transport parent:bloc{
 	string name <- "transport";
-	
 	transport_producer producer <- nil;
 	transport_consumer consumer <- nil;
 	
@@ -77,7 +75,6 @@ species transport parent:bloc{
 	list<string> get_input_resources_labels{
 		return production_inputs_T;
 	}
-
 	
 	action set_external_producer(string product, bloc bloc_agent){
 		// do nothing
@@ -101,13 +98,13 @@ species transport parent:bloc{
 	}
 	
 	action population_activity(list<human> pop) {
-    	ask pop{ // execute the consumption behavior of the population
+    	ask pop{
     		ask myself.transport_consumer{
     			do consume(myself);
     		}
     	}
     	 
-    	ask transport_consumer{ // produce the resuired quantities
+    	ask transport_consumer{ // produce the required quantities
     		ask transport_producer{
     			loop c over: myself.consumed.keys{
 		    		do produce([c::myself.consumed[c]]);
@@ -116,11 +113,6 @@ species transport parent:bloc{
     	}
     }
 
-	/**
-	 * We define here the production agent of the transport bloc as a micro-species (equivalent of nested class in Java).
-	 * We implement the methods of the API.
-	 * The production will be used in the implementation of 
-	 */
 	species transport_producer parent:production_agent{
 		map<string, float> tick_resources_used <- [];
 		map<string, float> tick_production <- [];
@@ -150,18 +142,8 @@ species transport parent:bloc{
 			}
 		}
 		
-		bool produce(map<string,float> demand){ // apply the input
+		bool produce(map<string,float> demand){
 			// TODO : la production concernera ici la création de nouvau véhicule
-//			loop c over: demand.keys{
-//				loop u over: production_inputs_T{  // needs (resources consumed/emitted) for this demand
-//					tick_resources_used[u] <- tick_resources_used[u] + production_output_inputs_T[c][u] * demand[c];
-//				}
-//				loop e over: production_emissions_T{ // apply emissions
-//					float quantity_emitted <- production_output_emissions_T[c][e] * demand[c];
-//					tick_emissions[e] <- tick_emissions[e] + quantity_emitted;
-//				}
-//				tick_production[c] <- tick_production[c] + demand[c];
-//			}
 			return true; // always return 'ok' signal
 		}
 		
@@ -170,33 +152,24 @@ species transport parent:bloc{
 		}
 	}
 	
-	/**
-	 * We define here the consumption agent of the transport bloc as a micro-species (equivalent of nested class in Java).
-	 * We implement the methods of the API.
-	 * The consumption is minimalistic here : we apply a random energy consumption for everyone.
-	 */
 	species transport_consumer parent:consumption_agent{
 		map<string, float> consumed <- [];
 		
 		map<string, float> get_tick_consumption{
 			return copy(consumed);
 		}
-		
 		init{
 			loop c over: production_outputs_T{
 				consumed[c] <- 0;
 			}
 		}
-		
 		action reset_tick_counters{ // reset choices counters
     		loop c over: consumed.keys{
     			consumed[c] <- 0;
     		}
 		}
-		
 		action consume(human h){
-		    string choice <- one_of(production_outputs_T); // note : here, there is only one production, energy
-			// consumed[choice] <- consumed[choice]+rnd(min_kWh_conso, max_kWh_conso);
+		    string choice <- one_of(production_outputs_T);
 		}
 	}
 }
@@ -208,7 +181,6 @@ species taxis parent:transport_mode {
 		create taxi_vehicle;
 	}
 }
-
 species trains parent:transport_mode {
 	init{
 		type <- "trains";
@@ -216,7 +188,6 @@ species trains parent:transport_mode {
 		create train_vehicle;
 	}
 }
-
 species minibuses parent:transport_mode {
 	init{
 		type <- "minibuses";
@@ -224,7 +195,6 @@ species minibuses parent:transport_mode {
 		create minibus_vehicle;
 	}
 }
-
 species bikes parent:transport_mode {
 	init{
 		type <- "bikes";
@@ -232,7 +202,6 @@ species bikes parent:transport_mode {
 		create bike_vehicle;
 	}
 }
-
 species trucks parent:transport_mode {
 	init{
 		type <- "trucks";
@@ -240,7 +209,6 @@ species trucks parent:transport_mode {
 		create truck_vehicle;
 	}
 }
-
 
 /**
  * We define here the experiment and the displays related to transport. 
