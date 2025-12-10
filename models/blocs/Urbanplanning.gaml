@@ -23,8 +23,7 @@ global {
 	map<string, map<string, float>> production_output_emissions_U <- ["modular_house_lobby" :: ["gCO2e emissions" :: 1000000.0], "modular_house_extension" :: ["gCO2e emissions" :: 30000.0], "wooden_building" :: ["gCO2e emissions" :: 300000.0]];
 	
 	map<string, float> indivudual_consumption_U <- ["modular_house_extension"::1.0, "modular_house_lobby"::0.05, "wooden_building"::0.000175];
-	//map<string, float> supplies_U <- ["modular_house_extension"::10000.0, "modular_house_lobby"::500.0, "wooden_building"::2.0];
-	map<string, float> supplies_U <- ["modular_house_extension"::0.0, "modular_house_lobby"::0.0, "wooden_building"::0.0];
+	map<string, float> supplies_U <- ["modular_house_extension"::10000.0, "modular_house_lobby"::500.0, "wooden_building"::2.0];
 	map<string, int> time_cost_U <- ["modular_house_extension"::1, "modular_house_lobby"::3, "wooden_building"::6];
 	
 	/* Counters & Stats */
@@ -119,6 +118,9 @@ species urbanplanning parent:bloc{
     			loop c over: myself.consumed.keys{
 		    		do produce([c::myself.consumed[c]]);
 		    	}
+		    	
+		    	add get_tick_demand() to: production_history_U;
+		    	//production_history_U <- production_history_U + get_tick_demand();
 		    }
     	}
     }
@@ -132,6 +134,7 @@ species urbanplanning parent:bloc{
 		map<string, float> tick_resources_used <- [];
 		map<string, float> tick_production <- [];
 		map<string, float> tick_emissions <- [];
+		map<string, float> tick_demand <- [];
 		
 		map<string, float> get_tick_inputs_used{
 			return tick_resources_used;
@@ -144,6 +147,10 @@ species urbanplanning parent:bloc{
 		map<string, float> get_tick_emissions{
 			return tick_emissions;
 		}
+		
+		map<string, float> get_tick_demand{
+			return tick_demand;
+		}
 	
 		action reset_tick_counters{ // reset impact counters
 			loop u over: production_inputs_U{
@@ -151,6 +158,7 @@ species urbanplanning parent:bloc{
 			}
 			loop p over: production_outputs_U{
 				tick_production[p] <- 0.0; // reset productions
+				tick_demand[p] <- 0.0;
 			}
 			loop e over: production_emissions_U{
 				tick_emissions[e] <- 0.0;
@@ -176,21 +184,20 @@ species urbanplanning parent:bloc{
 				}
 				tick_production[c] <- tick_production[c] + demand[c];
 
-				add [c::(demand[c] + supplies_U[c])] to: valeurs;
+
+				tick_demand[c] <- tick_demand[c] + (demand[c] + supplies_U[c]);
 
 				if(length(production_history_U) >= time_cost_U[c]){
 					float to_build <- (production_history_U at (length(production_history_U) - time_cost_U[c]))[c];
 					//write c + " demand : " + demand[c] + " supplies : " + supplies_U[c] + " to_build :"+to_build;
-					//if(to_build > supplies_U[c]){
-					//}
-					supplies_U[c] <- to_build;
+					if(to_build > supplies_U[c]){
+						supplies_U[c] <- to_build;
+					}
 				}
 				
 				
 			}
 			//add tick_production to: production_history_U;
-			production_history_U <- production_history_U + valeurs;
-			write production_history_U;
 			
 			return true; // always return 'ok' signal
 		}
