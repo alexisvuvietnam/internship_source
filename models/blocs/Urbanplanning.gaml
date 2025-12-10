@@ -13,18 +13,19 @@ import "../API/API.gaml"
 global {
 	/* Setup */
 	// TODO : adapter les productions et les ressources demandées sur les vrais variables et valeurs
-	list<string> production_inputs_U <- ["kg_plastic", "kg_wood"];
-	list<string> production_outputs_U <- ["house"];
+	list<string> production_inputs_U <- ["kg_plastic", "m3_wood"];
+	list<string> production_outputs_U <- ["modular_house_lobby", "modular_house_extension", "wooden_building"];
 	list<string> production_emissions_U <- ["gCO2e emissions"];
 	
 	/* Production data */
 	// TODO : adapter les production et le cout de celle ci sur les bonnes
-	map<string, map<string, float>> production_output_inputs_U <- ["house" :: ["kg_wood" :: 0.0, "kg_plastic" :: 3000.0]];
-	map<string, map<string, float>> production_output_emissions_U <- ["house" :: ["gCO2e emissions" :: 1000000.0]];
+	map<string, map<string, float>> production_output_inputs_U <- ["modular_house_lobby" :: ["m3_wood" :: 0.0, "kg_plastic" :: 3000.0], "modular_house_extension" :: ["m3_wood" :: 0.0, "kg_plastic" :: 600.0], "wooden_building" :: ["m3_wood" :: 80.0, "kg_plastic" :: 0.0]];
+	map<string, map<string, float>> production_output_emissions_U <- ["modular_house_lobby" :: ["gCO2e emissions" :: 1000000.0], "modular_house_extension" :: ["gCO2e emissions" :: 30000.0], "wooden_building" :: ["gCO2e emissions" :: 300000.0]];
 	
-	map<string, float> indivudual_consumption_U <- ["house"::1.0];
-	map<string, float> supplies_U <- ["house"::0.0];
-	map<string, int> time_cost_U <- ["house"::3];
+	map<string, float> indivudual_consumption_U <- ["modular_house_extension"::1.0, "modular_house_lobby"::0.05, "wooden_building"::0.000175];
+	//map<string, float> supplies_U <- ["modular_house_extension"::10000.0, "modular_house_lobby"::500.0, "wooden_building"::2.0];
+	map<string, float> supplies_U <- ["modular_house_extension"::0.0, "modular_house_lobby"::0.0, "wooden_building"::0.0];
+	map<string, int> time_cost_U <- ["modular_house_extension"::1, "modular_house_lobby"::3, "wooden_building"::6];
 	
 	/* Counters & Stats */
 	map<string, float> tick_production_U <- [];
@@ -164,6 +165,7 @@ species urbanplanning parent:bloc{
 				if(demand[c] < 0){
 					demand[c] <- 0;
 				}
+//				write c + " demand : "+ demand[c] + " supplies : " + supplies_U[c];
 				loop u over: production_inputs_U{  // needs (resources consumed/emitted) for this demand
 					float quantity_needed <- production_output_inputs_U[c][u] * demand[c]; // quantify the resources consumed/emitted by this demand
 					tick_resources_used[u] <- tick_resources_used[u] + quantity_needed;
@@ -178,6 +180,9 @@ species urbanplanning parent:bloc{
 
 				if(length(production_history_U) >= time_cost_U[c]){
 					float to_build <- (production_history_U at (length(production_history_U) - time_cost_U[c]))[c];
+					//write c + " demand : " + demand[c] + " supplies : " + supplies_U[c] + " to_build :"+to_build;
+					//if(to_build > supplies_U[c]){
+					//}
 					supplies_U[c] <- to_build;
 				}
 				
@@ -185,6 +190,7 @@ species urbanplanning parent:bloc{
 			}
 			//add tick_production to: production_history_U;
 			production_history_U <- production_history_U + valeurs;
+			write production_history_U;
 			
 			return true; // always return 'ok' signal
 		}
