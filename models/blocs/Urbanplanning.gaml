@@ -24,14 +24,14 @@ global {
 	
 	map<string, float> indivudual_consumption_U <- ["house"::1.0];
 	map<string, float> supplies_U <- ["house"::0.0];
-	map<string, float> time_cost_U <- ["house"::3.0];
+	map<string, int> time_cost_U <- ["house"::3];
 	
 	/* Counters & Stats */
 	map<string, float> tick_production_U <- [];
 	map<string, float> tick_pop_consumption_U <- [];
 	map<string, float> tick_resources_used_U <- [];
 	map<string, float> tick_emissions_U <- [];
-	map<string, list<float>> production_history_U <- production_outputs_U accumulate each::list<float>([]);
+	list<map<string, float>> production_history_U <- [];
 	
 	init{ // a security added to avoid launching an experiment without the other blocs
 		if (length(coordinator) = 0){
@@ -158,7 +158,7 @@ species urbanplanning parent:bloc{
 		
 		bool produce(map<string,float> demand){ // apply the input
 			// TODO : la production concernera ici la création de nouvau véhicule
-			
+			list<map<string, float>> valeurs <- [];
 			loop c over: demand.keys{
 				demand[c] <- demand[c] - supplies_U[c];
 				if(demand[c] < 0){
@@ -173,15 +173,19 @@ species urbanplanning parent:bloc{
 					tick_emissions[e] <- tick_emissions[e] + quantity_emitted;
 				}
 				tick_production[c] <- tick_production[c] + demand[c];
-				
-				supplies_U[c] <- supplies_U[c] + tick_production[c];
-				
-				//write production_history_U[c];
-	    		//production_history_U[c][cycle] <- tick_production[c];
-	    		//write get_past_production(c);
+
+				add [c::(demand[c] + supplies_U[c])] to: valeurs;
+
+				if(length(production_history_U) >= time_cost_U[c]){
+					float to_build <- (production_history_U at (length(production_history_U) - time_cost_U[c]))[c];
+					supplies_U[c] <- to_build;
+				}
 				
 				
 			}
+			//add tick_production to: production_history_U;
+			production_history_U <- production_history_U + valeurs;
+			
 			return true; // always return 'ok' signal
 		}
 		
