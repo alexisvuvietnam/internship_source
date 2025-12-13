@@ -327,7 +327,7 @@ species ter_vehicle parent:vehicle {
 		name <- "ter_vehicle";
 		consumption_per_km <- 14.2;
 		avg_speed <- 100.0;
-		max_passenger_capacity <- 0;
+		max_passenger_capacity <- 250;
 	}
 }
 species minibus_vehicle parent:vehicle {
