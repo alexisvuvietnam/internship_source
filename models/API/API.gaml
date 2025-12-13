@@ -300,7 +300,7 @@ species coordinator{
  */
 species vehicle {
 	string name;
-	float consumption_per_km;
+	float consumption_per_km; // kWh/km
 	float avg_speed; //km_per_hour
 	int max_passenger_capacity <- 0;
 	float max_delivery_capacity <- 0.0;
@@ -309,41 +309,49 @@ species vehicle {
 species taxi_vehicle parent:vehicle {
 	init {
 		name <- "taxi_vehicle";
-		consumption_per_km <- 16.0; // TODO : modifier avec vrai données
-		avg_speed <- 110.0; // TODO : modifier avec vrai données
+		consumption_per_km <- 0.17;
+		avg_speed <- 100.0;
 		max_passenger_capacity <- 4;
 	}
 }
-species train_vehicle parent:vehicle {
+species tgv_vehicle parent:vehicle {
 	init {
-		name <- "train_vehicle";
-		consumption_per_km <- 16.0; // TODO : modifier avec vrai données
-		avg_speed <- 160.0; // TODO : modifier avec vrai données
+		name <- "tgv_vehicle";
+		consumption_per_km <- 13.0;
+		avg_speed <- 300.0;
+		max_passenger_capacity <- 550;
+	}
+}
+species ter_vehicle parent:vehicle {
+	init {
+		name <- "ter_vehicle";
+		consumption_per_km <- 14.2;
+		avg_speed <- 100.0;
 		max_passenger_capacity <- 0;
 	}
 }
 species minibus_vehicle parent:vehicle {
 	init {
 		name <- "minibus_vehicle";
-		consumption_per_km <- 16.0; // TODO : modifier avec vrai données
-		avg_speed <- 50.0; // TODO : modifier avec vrai données
-		max_passenger_capacity <- 50; // TODO : modifier avec vrai données
+		consumption_per_km <- 2.0;
+		avg_speed <- 25.0;
+		max_passenger_capacity <- 90;
 	}
 }
 species bike_vehicle parent:vehicle {
 	init {
 		name <- "bike_vehicle";
 		consumption_per_km <- 0.0;
-		avg_speed <- 15.0; // TODO : modifier avec vrai données
-		max_passenger_capacity <- 1; // TODO : modifier avec vrai données
+		avg_speed <- 15.0;
+		max_passenger_capacity <- 1;
 	}
 }
 species truck_vehicle parent:vehicle {
 	init {
 		name <- "truck_vehicle";
-		consumption_per_km <- 16.0; // TODO : modifier avec vrai données
-		avg_speed <- 80.0; // modifier avec vrai données
-		max_delivery_capacity <- 0.0; //
+		consumption_per_km <- 2.0;
+		avg_speed <- 67.0;
+		max_delivery_capacity <- 0.0; // TODO remplacer avec les vraies données
 	}
 }
 

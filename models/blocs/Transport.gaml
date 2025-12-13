@@ -15,15 +15,18 @@ global {
 	list<string> production_emissions_T <- ["gCO2e emissions"];
 	
 	/* Production data */
-	// TODO : concerne les fabrication de nouveaux véhicules
-	//	map<string, map<string, float>> production_outputs_inputs_T <-
-	//	["minibus" :: ["kWh energy" :: 0.0, "kg plastic" :: 0.0],  
-	//	"train" :: ["kWh energy" :: 0.0, "kg plastic" :: 0.0],
-	//	"taxi" :: ["kWh energy" :: 0.0, "kg plastic" :: 0.0]];
-	//	map<string, map<string, float>> production_output_emissions_T <- 
-	//	["minibus" :: ["gCO2e emissions" :: 0.0],
-	//	"train" :: ["gCO2e emissions" :: 0.0],
-	//	"taxi" :: ["gCO2e emissions" :: 0.0]];
+	map<string, map<string, float>> production_outputs_inputs_T <-
+	["minibus" :: ["kWh energy" :: 51240.0, "kg plastic" :: 2390.0],  
+	"tgv" :: ["kWh energy" :: 1001250.0, "kg plastic" :: 46700.0],
+	"ter" :: ["kWh energy" :: 616185.0, "kg plastic" :: 28740.0],
+	"velo" :: ["kWh energy" :: 38.0, "kg plastic" :: 1.8],
+	"taxi" :: ["kWh energy" :: 34700.0, "kg plastic" :: 180.0]];
+	map<string, map<string, float>> production_output_emissions_T <- 
+	["minibus" :: ["gCO2e emissions" :: 9560000.0],
+	"tgv" :: ["gCO2e emissions" :: 326900000.0],
+	"ter" :: ["gCO2e emissions" :: 201180000.0],
+	"velo" :: ["gCO2e emissions" :: 150000.0],
+	"taxi" :: ["gCO2e emissions" :: 10000000.0]];
 	
 	/* Counters & Stats */
 	map<string, float> tick_production_T <- [];
@@ -177,35 +180,42 @@ species transport parent:bloc{
 species taxis parent:transport_mode {
 	init{
 		type <- "taxis";
-		number_available <- 1000; // TODO : remplacer par le vrai nombre national
+		number_available <- 119000;
 		create taxi_vehicle;
 	}
 }
-species trains parent:transport_mode {
+species tgv parent:transport_mode {
 	init{
-		type <- "trains";
-		number_available <- 1000; // TODO : remplacer par le vrai nombre national
-		create train_vehicle;
+		type <- "tgv";
+		number_available <- 350;
+		create tgv_vehicle;
+	}
+}
+species ter parent:transport_mode {
+	init{
+		type <- "ter";
+		number_available <- 2500;
+		create ter_vehicle;
 	}
 }
 species minibuses parent:transport_mode {
 	init{
 		type <- "minibuses";
-		number_available <- 1000; // TODO : remplacer par le vrai nombre national
+		number_available <- 28000;
 		create minibus_vehicle;
 	}
 }
 species bikes parent:transport_mode {
 	init{
 		type <- "bikes";
-		number_available <- 1000; // TODO : remplacer par le vrai nombre national
+		number_available <- 16600000;
 		create bike_vehicle;
 	}
 }
 species trucks parent:transport_mode {
 	init{
 		type <- "trucks";
-		number_available <- 1000; // TODO : remplacer par le vrai nombre national
+		number_available <- 305800;
 		create truck_vehicle;
 	}
 }
