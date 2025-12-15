@@ -264,7 +264,7 @@ species transport parent:bloc{
 	}
 	
 	species long_trip{
-		map<string, float> long_trip_decisions <- ["tgv"::0.3,"ter"::0.5,"taxi"::0.2];
+		map<string, float> long_trip_decisions <- ["tgv"::0.01845,"ter"::0.13205,"taxi"::0.8495];
 		float avg_long_trip_distance <- 500.0; // km - average distance for long trips
 		
 		taxis my_taxis <- nil;
