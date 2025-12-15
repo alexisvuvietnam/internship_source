@@ -77,25 +77,9 @@ species transport parent:bloc{
 	}
 	
 	action tick(list<human> pop){
+		int total_trips <- 10000;
 		do collect_last_tick_data();
-		do population_activity(pop);
-		
-		// process trips based on population size
-		int total_trips <- length(pop);
-		int long_trips <- int(total_trips * short_or_long["long"]);  // 20% long trips
-		int short_trips <- int(total_trips * short_or_long["short"]); // 80% short trips
-		
-		// reset and process long trips
-		ask long {
-			do reset_tick_counters();
-			do process_long_trips(long_trips);
-		}
-		
-		// reset and process short trips
-		ask short {
-			do reset_tick_counters();
-			do process_short_trips(short_trips);
-		}
+		do population_activity(pop, total_trips);
 	}
 	
 	production_agent get_producer{
@@ -149,7 +133,7 @@ species transport parent:bloc{
 	    }
 	}
 	
-	action population_activity(list<human> pop) {
+	action population_activity(list<human> pop, int nb_trajets) {
 	    // calculate trip numbers based on population
 	    int total_trips <- length(pop);
 	    int long_trips <- int(total_trips * short_or_long["long"]);
@@ -341,7 +325,7 @@ species transport parent:bloc{
 	}
 	
 	species short_trip{
-		map<string, float> short_trip_decisions <- ["minibus"::0.4,"bike"::0.4,"walking"::0.2];
+		map<string, float> short_trip_decisions <- ["minibus"::0.243,"bike"::0.074,"walking"::0.683];
 		float avg_short_trip_distance <- 5.0; // km - average distance for short trips
 		
 		minibuses my_minibuses <- nil;
