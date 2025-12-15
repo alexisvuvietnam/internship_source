@@ -191,9 +191,10 @@ species agricultural parent:bloc{
 						if not av{
 							ok <- false;
 						}
-					}else{
-						write "not exist u = " + u;
 					}
+					//else{
+					//	write "not exist u = " + u;
+					//}
 				}
 				loop e over: production_emissions_A{ // apply emissions
 					float quantity_emitted <- production_output_emissions_A[c][e] * demand[c];

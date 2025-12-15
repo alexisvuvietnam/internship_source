@@ -13,7 +13,7 @@ import "../API/API.gaml"
 global {
 	/* Setup */
 	// TODO : adapter les productions et les ressources demandées sur les vrais variables et valeurs
-	list<string> production_inputs_U <- ["m3_wood", "Wh energy"];
+	list<string> production_inputs_U <- ["m3_wood", "Wh energy", "kg_coton"];
 	list<string> production_outputs_U <- ["modular_house_lobby", "modular_house_extension", "wooden_building"];
 	list<string> autoproduction_U <- ["kg_plastic"];
 	list<string> production_emissions_U <- ["gCO2e emissions"];
@@ -24,7 +24,7 @@ global {
 	map<string, map<string, float>> production_output_emissions_U <- ["modular_house_lobby" :: ["gCO2e emissions" :: 1000000.0], "modular_house_extension" :: ["gCO2e emissions" :: 30000.0], "wooden_building" :: ["gCO2e emissions" :: 300000.0], "plastic_factory" :: ["" :: 50000000.0]];
 	
 	map<string, float> indivudual_consumption_U <- ["modular_house_extension"::1.0, "modular_house_lobby"::0.05, "wooden_building"::0.000175];
-	map<string, float> supplies_U <- ["modular_house_extension"::70000000.0, "modular_house_lobby"::3500000.0, "wooden_building"::1400.0, "plastic_factory"::0.0];
+	map<string, float> supplies_U <- ["modular_house_extension"::70000000.0, "modular_house_lobby"::3500000.0, "wooden_building"::1400.0, "plastic_factory"::1.0];
 	map<string, int> time_cost_U <- ["modular_house_extension"::1, "modular_house_lobby"::3, "wooden_building"::6, "plastic_factory"::48];
 	
 	/* Counters & Stats */
@@ -163,6 +163,7 @@ species urbanplanning parent:bloc{
 		}
 	
 		action reset_tick_counters{ // reset impact counters
+			write "tick counter reset";
 			loop a over: autoproduction_U{
 				tick_resources_used[a] <- 0.0; // reset resources usage
 				tick_production[a] <- 0.0;
@@ -198,17 +199,11 @@ species urbanplanning parent:bloc{
 							ok <- false;
 						}
 					}
-				}
-				loop a over: autoproduction_U{  // needs (resources consumed/emitted) for this demand
-					float quantity_needed <- production_output_inputs_U[c][a] * demand[c]; // quantify the resources consumed/emitted by this demand
-					// Gestion spécifique du plastique
-					if(a = "kg_plastic"){
-						float production_capacity <- 5000.0;//11000000.0*supplies_U["plastic_factory"];
-						float quantity_supplied <- min(production_capacity, quantity_needed);
-						tick_production[a] <- tick_production[a] + quantity_supplied;
-						tick_resources_used[a] <- tick_resources_used[a] + quantity_supplied;
-					}
 					
+				}
+				loop a over: autoproduction_U{
+					float quantity_needed <- production_output_inputs_U[c][a] * demand[c]; // quantify the resources consumed/emitted by this demand
+					tick_production[a] <- tick_production[a] + quantity_needed;
 				}
 				loop e over: production_emissions_U{ // apply emissions
 					float quantity_emitted <- production_output_emissions_U[c][e] * demand[c];
@@ -229,6 +224,13 @@ species urbanplanning parent:bloc{
 				
 				
 			}
+			
+			// Gestion spécifique du plastique
+			float production_capacity <- 11000000.0*supplies_U["plastic_factory"];
+			float quantity_supplied <- min(production_capacity, tick_production["kg_plastic"]);
+			tick_production["kg_plastic"] <- quantity_supplied;
+			tick_resources_used["kg_plastic"] <- quantity_supplied;
+
 			//add tick_production to: production_history_U;
 			
 			return ok;
@@ -291,17 +293,17 @@ experiment run_urban type: gui {
 			    }
 			}
 			chart "Total production" type: series  size: {0.5,0.5} position: {0.5, 0} {
-			    loop c over: production_outputs_U{
-			    	data c value: tick_production_U[c];
-			    }
+			    //loop c over: production_outputs_U{
+			    //	data c value: tick_production_U[c];
+			    //}
 			    loop a over: autoproduction_U{
 			    	data a value: tick_production_U[a];
 			    }
 			}
 			chart "Resources usage" type: series size: {0.5,0.5} position: {0, 0.5} {
-			    loop r over: production_inputs_U{
-			    	data r value: tick_resources_used_U[r];
-			    }
+			    //loop r over: production_inputs_U{
+			    //	data r value: tick_resources_used_U[r];
+			    //}
 			    loop a over: autoproduction_U{
 			    	data a value: tick_resources_used_U[a];
 			    }
