@@ -14,27 +14,30 @@ import "../API/API.gaml"
 global{
 	
 	/* Setup */
-	list<string> production_outputs_A <- ["kg_meat", "kg_vegetables", "kg_coton"];
+	list<string> production_outputs_A <- ["kg_meat", "kg_vegetables", "kg_cotton"];
 	list<string> production_inputs_A <- ["L water", "kWh energy", "m² land"];
 	list<string> production_emissions_A <- ["gCO2e emissions"];
-	int pop_size <- 67920000;
+	int pop_size <- 70000000;
 	int prop_human <- 7000;
 	
 	/* Production data */
 	map<string, map<string, float>> production_output_inputs_A <- [
 		"kg_meat"::["L water"::550.0, "kWh energy"::6.31, "m² land"::25.0, "gCO2e emissions"::9000.0],
 		"kg_vegetables"::["L water"::322.0, "kWh energy"::0.86, "m² land"::0.6, "gCO2e emissions"::210.0],
-		"kg_coton"::["L water"::6000.0, "kWh energy"::0.5, "m² land"::15.0, "gCO2e emissions"::6600.0]
+		"kg_cotton"::["L water"::6000.0, "kWh energy"::0.5, "m² land"::15.0, "gCO2e emissions"::6600.0]
 	]; 
 	map<string, map<string, float>> production_output_emissions_A <- [
 		"kg_meat"::["gCO2e emissions"::9000.0],
 		"kg_vegetables"::["gCO2e emissions"::210.0],
-		"kg_coton"::["gCO2e emissions"::6600.0]
+		"kg_cotton"::["gCO2e emissions"::6600.0]
 	]; 
+	
 	
 	
 	/* Consumption data */
 	map<string, float> indivudual_consumption_A <- ["kg_meat"::2*prop_human, "kg_vegetables"::15*prop_human]; // monthly consumption per individual of the population. Note : this is fake data.
+	float surface_veg <- indivudual_consumption_A["kg_vegetables"]*production_output_inputs_A["kg_vegetables"]["m² land"];
+	float surface_meat <- indivudual_consumption_A["kg_meat"]*production_output_inputs_A["kg_meat"]["m² land"];
 	
 	/* Counters & Stats */
 	map<string, float> tick_production_A <- [];
@@ -58,6 +61,7 @@ global{
  */
 species agricultural parent:bloc{
 	string name <- "agricultural";
+	int tick_counter <- 0;
 	
 	agri_producer producer <- nil;
 	agri_consumer consumer <- nil;
@@ -74,6 +78,12 @@ species agricultural parent:bloc{
 	action tick(list<human> pop) {
 		do collect_last_tick_data();
 		do population_activity(pop);
+		if (tick_counter = 12){
+			tick_counter <- 0;
+		}else{
+			tick_counter <- tick_counter + 1;
+		}
+		
 	}
 	
 	action set_external_producer(string product, bloc bloc_agent){
@@ -185,14 +195,15 @@ species agricultural parent:bloc{
 				loop u over: production_inputs_A{
 					float quantity_needed <- production_output_inputs_A[c][u] * demand[c]; // quantify the resources consumed/emitted by this demand
 					tick_resources_used[u] <- tick_resources_used[u] + quantity_needed;
-					if(external_producers.keys contains u){ // if there is a known external producer for this product/good
+					if((external_producers.keys contains u) and (u != "m² land")){ // if there is a known external producer for this product/good
 						//write "exist u = " + u;
 						bool av <- external_producers[u].producer.produce([u::quantity_needed]); // ask the external producer to product the required quantity
 						if not av{
 							ok <- false;
+							write "Ressource "+ u +" refusé, quantité demandé : "+quantity_needed;
 						}
 					}else{
-						write "not exist u = " + u;
+						//write "not exist u = " + u;
 					}
 				}
 				loop e over: production_emissions_A{ // apply emissions
