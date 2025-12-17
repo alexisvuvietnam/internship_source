@@ -90,6 +90,10 @@ species agricultural parent:bloc{
 		return production_outputs_A;
 	}
 	
+	list<string> get_output_resources_labels{
+		return production_outputs_A;
+	}	
+	
 	list<string> get_input_resources_labels{
 		return production_inputs_A;
 	}
