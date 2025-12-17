@@ -24,7 +24,7 @@ global {
 	map<string, map<string, float>> production_output_emissions_U <- ["modular_house_lobby" :: ["gCO2e emissions" :: 1000000.0], "modular_house_extension" :: ["gCO2e emissions" :: 30000.0], "wooden_building" :: ["gCO2e emissions" :: 300000.0], "plastic_factory" :: ["gCO2e emissions" :: 50000000.0], "kg_plastic" :: ["gCO2e emissions" :: 0.0]];
 	
 	map<string, float> indivudual_consumption_U <- ["modular_house_extension"::1.0, "modular_house_lobby"::0.05, "wooden_building"::0.000175];
-	map<string, float> supplies_U <- ["modular_house_extension"::70000000.0, "modular_house_lobby"::3500000.0, "wooden_building"::1400.0, "plastic_factory"::1.0];
+	map<string, float> supplies_U <- ["modular_house_extension"::70000000.0, "modular_house_lobby"::3500000.0, "wooden_building"::1400.0, "plastic_factory"::1000.0];
 	map<string, int> time_cost_U <- ["modular_house_extension"::1, "modular_house_lobby"::3, "wooden_building"::6, "plastic_factory"::48];
 	
 	/* Counters & Stats */
@@ -215,17 +215,19 @@ species urbanplanning parent:bloc{
 					tick_emissions[e] <- tick_emissions[e] + quantity_emitted;
 				}
 				tick_production[c] <- tick_production[c] + demand[c];
+				supplies_U[c] <- supplies_U[c] + tick_production[c];
 
 
 				tick_demand[c] <- tick_demand[c] + (demand[c] + supplies_U[c]);
 
-				if(length(production_history_U) >= time_cost_U[c] and c != "kg_plastic"){
-					float to_build <- (production_history_U at (length(production_history_U) - time_cost_U[c]))[c];
-					//write c + " demand : " + demand[c] + " supplies : " + supplies_U[c] + " to_build :"+to_build;
-					if(to_build > supplies_U[c]){
-						supplies_U[c] <- to_build;
-					}
-				}
+				// Code obsolète pour le temps de production macro
+				//if(length(production_history_U) >= time_cost_U[c] and c != "kg_plastic"){
+				//	float to_build <- (production_history_U at (length(production_history_U) - time_cost_U[c]))[c];
+				//	//write c + " demand : " + demand[c] + " supplies : " + supplies_U[c] + " to_build :"+to_build;
+				//	if(to_build > supplies_U[c]){
+				//		supplies_U[c] <- to_build;
+				//	}
+				//}
 				
 				
 			}
