@@ -208,7 +208,6 @@ species transport parent:bloc{
 		            	float quantity_needed <- 0.0;
 		            	if (c in production_trips){
 	            			quantity_needed <- tick_trip_energy[c];
-	            			write quantity_needed;
 	            		}
 						tick_resources_used[u] <- tick_resources_used[u] + quantity_needed;
 						if(external_producers.keys contains u){
