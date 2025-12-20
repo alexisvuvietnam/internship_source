@@ -598,27 +598,7 @@ experiment run_transport type: gui {
                 [cycle, e, tick_emissions_T[e]]
             to: "results_files/transport/transport_emissions.csv" format: "csv" rewrite: false;
         }
-	}
-	output {
-		display Transport_information type: 2d{
-			
-			chart "Energy consumption by mode" type: series size: {0.5,0.5} position: {0, 0.5} {
-			    loop mode over: transport_name {
-	    			data mode value: tick_trip_energy[mode];
-	    		}
-			    data "total" value: tick_resources_used_T["kWh energy"];
-			}
-			chart "Production emissions" type: series size: {0.5,0.5} position: {0.5, 0.5} {
-			    loop e over: production_emissions_T{
-			    	data e value: tick_emissions_T[e];
-			    }
-			}
-	    }
-	}
-}
-experiment run_transport_trips type: gui {
-	reflex save_results {
-		loop mode over: long_transport {
+        loop mode over: long_transport {
             save
                 [cycle, mode, tick_long_trips[mode]]
             to: "results_files/transport/transport_long_trips.csv" format: "csv" rewrite: false;
@@ -635,8 +615,15 @@ experiment run_transport_trips type: gui {
         }
 	}
 	output {
-		display Trip_Statistics {
-	    	chart "Long trips by mode" type: series size: {0.5,0.5} position: {0, 0} {
+		display Transport_information type: 2d{
+			
+			chart "Energy consumption by mode" type: series size: {0.5,0.5} position: {0, 0.5} {
+			    loop mode over: transport_name {
+	    			data mode value: tick_trip_energy[mode];
+	    		}
+			    data "total" value: tick_resources_used_T["kWh energy"];
+			}
+			chart "Number of long trips by mode" type: series size: {0.5,0.5} position: {0, 0} {
 	    		loop mode over: long_transport {
 	    			data mode value: tick_long_trips[mode];
 	    		}
