@@ -13,7 +13,7 @@ import "../API/API.gaml"
 global {
 	/* Setup */
 	// TODO : adapter les productions et les ressources demandées sur les vrais variables et valeurs
-	list<string> production_inputs_U <- ["m3_wood", "Wh energy", "kg_coton"];
+	list<string> production_inputs_U <- ["m3_wood", "Wh energy", "kg_coton", "m² land"];
 	list<string> production_outputs_U <- ["modular_house_lobby", "modular_house_extension", "wooden_building"];
 	list<string> autoproduction_U <- ["kg_plastic"];
 	list<string> production_emissions_U <- ["gCO2e emissions"];
@@ -22,11 +22,12 @@ global {
 	// TODO : adapter les production et le cout de celle ci sur les bonnes
 	map<string, map<string, float>> production_output_inputs_U <- ["modular_house_lobby" :: ["m3_wood" :: 0.0, "kg_plastic" :: 3000.0], "modular_house_extension" :: ["m3_wood" :: 0.0, "kg_plastic" :: 600.0], "wooden_building" :: ["m3_wood" :: 80.0, "kg_plastic" :: 0.0], "plastic_factory" :: ["m3_wood" :: 184000.0, "kg_plastic" :: 42000000.0], "kg_plastic" :: ["kg_coton" :: 16.5, "Wh energy" :: 6.0]];
 	map<string, map<string, float>> production_output_emissions_U <- ["modular_house_lobby" :: ["gCO2e emissions" :: 1000000.0], "modular_house_extension" :: ["gCO2e emissions" :: 30000.0], "wooden_building" :: ["gCO2e emissions" :: 300000.0], "plastic_factory" :: ["gCO2e emissions" :: 50000000.0], "kg_plastic" :: ["gCO2e emissions" :: 0.0]];
+	map<string, map<string, float>> supply_upkeep_U <- ["modular_house_lobby" :: ["m² land" :: 0.0], "modular_house_extension" :: ["m² land" :: 50.0], "wooden_building" :: ["m² land" :: 100.0], "plastic_factory" :: ["m² land" :: 1000000.0]];
 	float factory_production_capacity <- 11000000.0;
 	
 	
 	map<string, float> indivudual_consumption_U <- ["modular_house_extension"::1.0, "modular_house_lobby"::0.05, "wooden_building"::0.000175];
-	map<string, float> supplies_U <- ["modular_house_extension"::70000000.0, "modular_house_lobby"::3500000.0, "wooden_building"::1400.0, "plastic_factory"::4.0];
+	map<string, float> supplies_U <- ["modular_house_extension"::70000000.0, "modular_house_lobby"::3500000.0, "wooden_building"::1400.0, "plastic_factory"::10.0];
 	map<string, int> time_cost_U <- ["modular_house_extension"::1, "modular_house_lobby"::3, "wooden_building"::6, "plastic_factory"::48];
 	
 	/* Counters & Stats */
@@ -135,7 +136,7 @@ species urbanplanning parent:bloc{
 		    	if(plastic_budget < 0){
 		    		plastic_budget <- 0.0;
 		    	}
-		    	to_build <- [];
+		    	to_build <- ["plastic_factory"::0];
 		    	
 		    	// Battiments indiviuels
     			loop c over: myself.consumed.keys{
@@ -211,6 +212,16 @@ species urbanplanning parent:bloc{
 
 				loop u over: production_inputs_U{  // needs (resources consumed/emitted) for this demand
 					float quantity_needed <- production_output_inputs_U[c][u] * demand[c]; // quantify the resources consumed/emitted by this demand
+					
+					// Gestion cout d'entretient
+					if(supply_upkeep_U.keys contains c){
+					        map<string, float> upkeep_requirements <- supply_upkeep_U[c];
+					        
+					        if(upkeep_requirements.keys contains u){
+					            float upkeep_cost <- supplies_U[c] * upkeep_requirements[u];
+					            quantity_needed <- quantity_needed + upkeep_cost;
+					        }
+					}
 					
 					tick_resources_used[u] <- tick_resources_used[u] + quantity_needed;
 					if(!(autoproduction_U contains u)){
