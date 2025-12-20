@@ -152,9 +152,6 @@ species transport parent:bloc{
 	    int long_trips <- int(nb_population * (nb_weeks_per_month * long_trips_per_week));
 	    int short_trips <- int(nb_population * (nb_weeks_per_month * short_trips_per_week));
 	    
-	    write "nb long :" + long_trips;
-	    write "nb short :" + short_trips;
-	    
 	    // reset and process trips
 	    ask long {
 	        do reset_tick_counters();
