@@ -1,10 +1,12 @@
 /**
-* Name: Ecosystem2
+* Name: Ecosystem
 * Bloc représentant l'écosystème qui fournit le bois, le gibier et l'eau aux autres blocs. 
+* Écosystème on aurait dû l'appeler environnement en fait...
+*
 * Author: natmax93
 * Tags: 
 */
-model Ecosystem2
+model Ecosystem
 
 import "../API/API.gaml"
 
@@ -13,21 +15,23 @@ import "../API/API.gaml"
  */
 global {
 
-/* Setup */
-/* Contient les demandes de ressources des autres blocs.
-	 * Ce n'est pas vraiment de la production.
-	 */
-	list<string> production_outputs_ECO <- ["m3_wood", "L water", "kg_meat"];
-	list<string> production_inputs_ECO <- [];
+/* Contient les demandes de ressources des autres blocs. */
+	list<string> production_outputs_ECO <- ["m3_wood", "L water", "kg_meat", "m² land"];
+	list<string> production_inputs_ECO <- ["gCO2e emissions"];
 	list<string> production_emissions_ECO <- ["gCO2e emissions"]; // émissions absorbées (négatives)
 
 	/* Le stock des différentes ressources naturelles à l'initialisation (cad la France de 2022) */
 	float stock_wood <- 3.1; // en milliards
 	float stock_meat <- 150.0 * 1; // en millions
+	float total_surface <- 5.44e11; // Surface de la France métropolitaine en m2
+	float forest_surface <- 1.71e11; // La forêt correspond à 171 000 km2 (m2)
+	/*  Surface dispo pour les autres secteurs  après avoir retiré la surface de la forêt de base */
+	float available_surface <- total_surface - forest_surface;
+	float used_surface <- 0.0; // Surface utilisée par les autres secteurs
 
-	/* Production annuelle de bois */
-	float prod_wood <- 0.0878;
-	float prod_meat <- 0.9 * 150.0; // Un sanglier européen pèse environ 150 kg
+	/* Production annuelle convertie en production mensuelle*/
+	float prod_wood <- 0.0878 / 12;
+	float prod_meat <- 0.9 * 150.0 / 12; // Un sanglier européen pèse environ 150 kg
 
 	/* GES absorbé par mois (en moyenne période 2007 à 2020 */
 	float GES_absorbe_per_tick <- 83.0; // en milliers
@@ -123,6 +127,7 @@ species ecosystem parent: bloc {
 			tick_production["m3_wood"] <- 0.0;
 			tick_production["L water"] <- 0.0;
 			tick_production["kg_meat"] <- 0.0;
+			tick_production["m² land"] <- 0.0;
 			tick_emissions["gCO2e emissions"] <- 0.0;
 		}
 
@@ -158,6 +163,18 @@ species ecosystem parent: bloc {
 					tick_production[r] <- tick_production[r] + qty;
 				}
 
+				/* Attribution de la surface */
+				if (r = "m² land") {
+					if (available_surface >= qty) {
+						available_surface <- available_surface - qty;
+						used_surface <- used_surface + qty;
+						tick_production[r] <- tick_production[r] + qty;
+					} else {
+						return false; // Plus de surface
+					}
+
+				}
+
 			}
 
 			/* Émission de GES (absorbtion dans le cas de l'écosystème */
@@ -186,6 +203,19 @@ species ecosystem parent: bloc {
 
 	}
 
+	/**
+	 * L'environnement affiche les émissions de CO2
+	  */
+//	species eco_consumer parent:consumption_agent {
+	//		
+	//		// TODO
+	//		action consume(human h) {
+	//			
+	//		}
+	//		
+	//		action
+	//	}
+
 }
 
 /********************************************
@@ -196,12 +226,14 @@ experiment run_ecosystem type: gui {
 		display Ecosystem_stock_information type: 2d {
 			chart "Évolution du stock de bois (en milliards)" type: series size: {0.5, 0.5} position: {0, 0} {
 				data "Stock de bois" value: stock_wood;
-				//				data "Utilisation totale d'eau" value: used_water;
 			}
 
 			chart "Évolution du stock du nombre de gibiers (en millions)" type: series size: {0.5, 0.5} position: {0, 0.5} {
 				data "Stock de gibier (sangliers)" value: stock_meat / 150.0;
-				//				data "Utilisation totale d'eau" value: used_water;
+			}
+
+			chart "Évolution de la surface dispo (en m2)" type: series size: {0.5, 0.5} position: {0.5, 0} {
+				data "Surface libre" value: available_surface;
 			}
 
 		}
@@ -221,6 +253,15 @@ experiment run_ecosystem type: gui {
 
 			chart "Quantité de GES absorbée à chaque tick" type: series size: {0.5, 0.5} position: {0.5, 0.5} {
 				data "GES" value: tick_absorbed_ECO["gCO2e emissions"];
+			}
+
+		}
+
+		display Surface_usage type: 2d {
+			chart "Utilisation de la surface pour chaque secteur (en km2)" type: pie {
+				data "Forêt" value: forest_surface / 1e6 color: #green;
+				data "Dispo" value: available_surface / 1e6 color: #blue;
+				data "Autre" value: used_surface / 1E6 color: #gray;
 			}
 
 		}
