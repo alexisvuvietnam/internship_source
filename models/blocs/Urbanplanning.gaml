@@ -22,9 +22,11 @@ global {
 	// TODO : adapter les production et le cout de celle ci sur les bonnes
 	map<string, map<string, float>> production_output_inputs_U <- ["modular_house_lobby" :: ["m3_wood" :: 0.0, "kg_plastic" :: 3000.0], "modular_house_extension" :: ["m3_wood" :: 0.0, "kg_plastic" :: 600.0], "wooden_building" :: ["m3_wood" :: 80.0, "kg_plastic" :: 0.0], "plastic_factory" :: ["m3_wood" :: 184000.0, "kg_plastic" :: 42000000.0], "kg_plastic" :: ["kg_coton" :: 16.5, "Wh energy" :: 6.0]];
 	map<string, map<string, float>> production_output_emissions_U <- ["modular_house_lobby" :: ["gCO2e emissions" :: 1000000.0], "modular_house_extension" :: ["gCO2e emissions" :: 30000.0], "wooden_building" :: ["gCO2e emissions" :: 300000.0], "plastic_factory" :: ["gCO2e emissions" :: 50000000.0], "kg_plastic" :: ["gCO2e emissions" :: 0.0]];
+	float factory_production_capacity <- 11000000.0;
+	
 	
 	map<string, float> indivudual_consumption_U <- ["modular_house_extension"::1.0, "modular_house_lobby"::0.05, "wooden_building"::0.000175];
-	map<string, float> supplies_U <- ["modular_house_extension"::70000000.0, "modular_house_lobby"::3500000.0, "wooden_building"::1400.0, "plastic_factory"::1.0];
+	map<string, float> supplies_U <- ["modular_house_extension"::70000000.0, "modular_house_lobby"::3500000.0, "wooden_building"::1400.0, "plastic_factory"::4.0];
 	map<string, int> time_cost_U <- ["modular_house_extension"::1, "modular_house_lobby"::3, "wooden_building"::6, "plastic_factory"::48];
 	
 	/* Counters & Stats */
@@ -54,6 +56,7 @@ species urbanplanning parent:bloc{
 	urban_consumer consumer <- nil;
 	
 	map<string, int> to_build <- [];
+	float plastic_budget <- factory_production_capacity*supplies_U["plastic_factory"];
 	
 	action setup{
 		list<urban_producer> producers <- [];
@@ -119,17 +122,26 @@ species urbanplanning parent:bloc{
     		}
     	}
     	 
+    	 
+    	plastic_budget <- factory_production_capacity*supplies_U["plastic_factory"];
+    	
     	ask urban_consumer{ // produce the resuired quantities
     		ask urban_producer{
+    			// Battiments non-individuels
+		    	loop p over: to_build.keys{
+		    		do produce([p::to_build[p]]);
+		    	}
+		    	
+		    	if(plastic_budget < 0){
+		    		plastic_budget <- 0.0;
+		    	}
+		    	to_build <- [];
+		    	
+		    	// Battiments indiviuels
     			loop c over: myself.consumed.keys{
 		    		do produce([c::myself.consumed[c]]);
 		    	}
-		    	loop p over: to_build.keys{
-		    		do produce([p::to_build[p]]);
-		    	} 
-		    	to_build <- [];
 				//do produce(["plastic_factory"::100]);
-		    	
 		    	add get_tick_demand() to: production_history_U;
 		    	//production_history_U <- production_history_U + get_tick_demand();
 		    }
@@ -196,9 +208,10 @@ species urbanplanning parent:bloc{
 				if(demand[c] < 0){
 					demand[c] <- 0;
 				}
-				//write c + " demand : "+ demand[c] + " supplies : " + demand;
+
 				loop u over: production_inputs_U{  // needs (resources consumed/emitted) for this demand
 					float quantity_needed <- production_output_inputs_U[c][u] * demand[c]; // quantify the resources consumed/emitted by this demand
+					
 					tick_resources_used[u] <- tick_resources_used[u] + quantity_needed;
 					if(!(autoproduction_U contains u)){
 						if(external_producers.keys contains u and quantity_needed > 0){ // if there is a known external producer for this product/good
@@ -212,6 +225,25 @@ species urbanplanning parent:bloc{
 				}
 				loop a over: autoproduction_U{
 					float quantity_needed <- production_output_inputs_U[c][a] * demand[c]; // quantify the resources consumed/emitted by this demand
+					
+					// Pénuries plastique
+					if(plastic_budget <= 0){ // Pas de budget
+						quantity_needed <- 0.0;
+						demand[c] <- 0;
+						plastic_budget <- plastic_budget - quantity_needed;
+					}
+					else if(quantity_needed > plastic_budget){ // Overbudget
+					    float production_cost <- production_output_inputs_U[c][a];
+					    
+				        demand[c] <- plastic_budget / production_cost; 
+					    plastic_budget <- plastic_budget - quantity_needed;
+					    
+					    quantity_needed <- production_cost * demand[c];
+					}
+					else{
+					    plastic_budget <- plastic_budget - quantity_needed;
+					}
+					
 					tick_production[a] <- tick_production[a] + quantity_needed;
 					tick_resources_used[a] <- tick_resources_used[a] + quantity_needed;
 				}
@@ -226,7 +258,7 @@ species urbanplanning parent:bloc{
 
 
 				tick_demand[c] <- tick_demand[c] + (demand[c] + supplies_U[c]);
-
+				
 				// Code obsolète pour le temps de production macro
 				//if(length(production_history_U) >= time_cost_U[c] and c != "kg_plastic"){
 				//	float to_build <- (production_history_U at (length(production_history_U) - time_cost_U[c]))[c];
@@ -240,13 +272,15 @@ species urbanplanning parent:bloc{
 			}
 			
 			// Gestion spécifique du plastique
-			float production_capacity <- 11000000.0*supplies_U["plastic_factory"];
+			float production_capacity <- factory_production_capacity*supplies_U["plastic_factory"];
 			float quantity_supplied <- min(production_capacity, tick_production["kg_plastic"]);
-			if(quantity_supplied < tick_production["kg_plastic"]){
-				float diff <- tick_production["kg_plastic"] - quantity_supplied;
-				int nb_to_build <- int(ceil(diff / 11000000.0));
-				//add ["plastic_factory"::nb_to_build] to: to_build;
-				to_build["plastic_factory"] <- nb_to_build;
+			
+			if(plastic_budget <= 0){
+				int nb_to_build <- int(ceil(abs(plastic_budget) / factory_production_capacity));
+				
+				if(to_build["plastic_factory"] <= supplies_U["plastic_factory"]){
+					to_build["plastic_factory"] <- nb_to_build+supplies_U["plastic_factory"];
+				}
 			}
 			tick_production["kg_plastic"] <- quantity_supplied;
 			float quantity_usedup <- min(production_capacity, tick_resources_used["kg_plastic"]);
