@@ -24,7 +24,7 @@ global {
 	map<string, map<string, float>> production_output_emissions_U <- ["modular_house_lobby" :: ["gCO2e emissions" :: 1000000.0], "modular_house_extension" :: ["gCO2e emissions" :: 30000.0], "wooden_building" :: ["gCO2e emissions" :: 300000.0], "plastic_factory" :: ["gCO2e emissions" :: 50000000.0], "kg_plastic" :: ["gCO2e emissions" :: 0.0]];
 	
 	map<string, float> indivudual_consumption_U <- ["modular_house_extension"::1.0, "modular_house_lobby"::0.05, "wooden_building"::0.000175];
-	map<string, float> supplies_U <- ["modular_house_extension"::70000000.0, "modular_house_lobby"::3500000.0, "wooden_building"::1400.0, "plastic_factory"::1000.0];
+	map<string, float> supplies_U <- ["modular_house_extension"::70000000.0, "modular_house_lobby"::3500000.0, "wooden_building"::1400.0, "plastic_factory"::1.0];
 	map<string, int> time_cost_U <- ["modular_house_extension"::1, "modular_house_lobby"::3, "wooden_building"::6, "plastic_factory"::48];
 	
 	/* Counters & Stats */
@@ -52,6 +52,8 @@ species urbanplanning parent:bloc{
 	
 	urban_producer producer <- nil;
 	urban_consumer consumer <- nil;
+	
+	map<string, int> to_build <- [];
 	
 	action setup{
 		list<urban_producer> producers <- [];
@@ -122,6 +124,11 @@ species urbanplanning parent:bloc{
     			loop c over: myself.consumed.keys{
 		    		do produce([c::myself.consumed[c]]);
 		    	}
+		    	loop p over: to_build.keys{
+		    		do produce([p::to_build[p]]);
+		    	} 
+		    	to_build <- [];
+				//do produce(["plastic_factory"::100]);
 		    	
 		    	add get_tick_demand() to: production_history_U;
 		    	//production_history_U <- production_history_U + get_tick_demand();
@@ -235,9 +242,16 @@ species urbanplanning parent:bloc{
 			// Gestion spécifique du plastique
 			float production_capacity <- 11000000.0*supplies_U["plastic_factory"];
 			float quantity_supplied <- min(production_capacity, tick_production["kg_plastic"]);
+			if(quantity_supplied < tick_production["kg_plastic"]){
+				float diff <- tick_production["kg_plastic"] - quantity_supplied;
+				int nb_to_build <- int(ceil(diff / 11000000.0));
+				//add ["plastic_factory"::nb_to_build] to: to_build;
+				to_build["plastic_factory"] <- nb_to_build;
+			}
 			tick_production["kg_plastic"] <- quantity_supplied;
 			float quantity_usedup <- min(production_capacity, tick_resources_used["kg_plastic"]);
 			tick_resources_used["kg_plastic"] <- quantity_usedup;
+			
 
 			//add tick_production to: production_history_U;
 			
