@@ -524,6 +524,28 @@ species trucks parent:transport_mode {
  * If needed, a new experiment combining all those displays should be added, for example in the Main code of the simulation.
  */
 experiment run_transport type: gui {
+	reflex save_results {
+		loop c over: production_outputs_T {
+            save
+                [cycle, c, tick_pop_consumption_T[c]]
+            to: "results_files/transport/transport_consumption.csv" format: "csv" rewrite: false; // Pensez à supprimer les anciens fichiers entre deux experiments
+        }
+        loop c over: production_outputs_T {
+            save
+                [cycle, c, tick_production_T[c]]
+            to: "results_files/transport/transport_production.csv" format: "csv" rewrite: false;
+        }
+        loop r over: production_inputs_T {
+            save
+                [cycle, r, tick_resources_used_T[r]]
+            to: "results_files/transport/transport_ressources.csv" format: "csv" rewrite: false;
+        }
+        loop e over: production_emissions_T {
+            save
+                [cycle, e, tick_emissions_T[e]]
+            to: "results_files/transport/transport_emissions.csv" format: "csv" rewrite: false;
+        }
+	}
 	output {
 		display Transport_information type: 2d{
 			chart "Population direct consumption" type: series  size: {0.5,0.5} position: {0, 0} {
@@ -550,6 +572,23 @@ experiment run_transport type: gui {
 	}
 }
 experiment run_transport_trips type: gui {
+	reflex save_results {
+		loop mode over: long_transport {
+            save
+                [cycle, mode, tick_long_trips[mode]]
+            to: "results_files/transport/transport_long_trips.csv" format: "csv" rewrite: false;
+        }
+        loop mode over: short_transport {
+            save
+                [cycle, mode, tick_short_trips[mode]]
+            to: "results_files/transport/transport_short_trips.csv" format: "csv" rewrite: false;
+        }
+        loop mode over: transport_name {
+            save
+                [cycle, mode, tick_trip_energy[mode]]
+            to: "results_files/transport/transport_trip_energy.csv" format: "csv" rewrite: false;
+        }
+	}
 	output {
 		display Trip_Statistics {
 	    	chart "Long trips by mode" type: series size: {0.5,0.5} position: {0, 0} {
