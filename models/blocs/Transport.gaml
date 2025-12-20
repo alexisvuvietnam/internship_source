@@ -82,9 +82,8 @@ species transport parent:bloc{
 	}
 	
 	action tick(list<human> pop){
-		int total_trips <- 10000;
 		do collect_last_tick_data();
-		do population_activity(pop, total_trips);
+		do population_activity(pop);
 	}
 	
 	production_agent get_producer{
@@ -140,11 +139,21 @@ species transport parent:bloc{
 	    }
 	}
 	
-	action population_activity(list<human> pop, int nb_trajets) {
+	action population_activity(list<human> pop) {
 	    // calculate trip numbers based on population
-	    int total_trips <- length(pop);
-	    int long_trips <- int(total_trips * short_or_long["long"]);
-	    int short_trips <- int(total_trips * short_or_long["short"]);
+	    int agreg_pop <- 66352; // TODO : multiplier par le facteur d'agregation décidé de la population
+	    int nb_population <- length(pop) * agreg_pop; 
+	    //number of long trips or short trips in a month is decided by the hypothesises explained in the paper
+	    int short_trips_per_week <- 14; // average of 2 trips per day
+	    int long_trips_per_week <- 1;
+	    
+	    float nb_weeks_per_month <- 4.34524;
+	    
+	    int long_trips <- int(nb_population * (nb_weeks_per_month * long_trips_per_week));
+	    int short_trips <- int(nb_population * (nb_weeks_per_month * short_trips_per_week));
+	    
+	    write "nb long :" + long_trips;
+	    write "nb short :" + short_trips;
 	    
 	    // reset and process trips
 	    ask long {
@@ -293,7 +302,8 @@ species transport parent:bloc{
 	}
 	
 	species long_trip{
-		map<string, float> long_trip_decisions <- ["trip_tgv"::0.01845,"trip_ter"::0.13205,"trip_taxi"::0.8495];
+		map<string, float> long_trip_decisions_france_data <- ["trip_tgv"::0.01845,"trip_ter"::0.13205,"trip_taxi"::0.8495];
+		map<string, float> long_trip_decisions_ecotopia <- ["trip_tgv"::0.60,"trip_ter"::0.40,"trip_taxi"::0.10];
 		float avg_long_trip_distance <- 500.0#km; // km - average distance for long trips
 		taxis my_taxis <- nil;
 		ters my_ters <- nil;
@@ -314,32 +324,41 @@ species transport parent:bloc{
 		
 		action process_long_trips(int trip_number){
 			// distribute trips according to probabilities
-			loop mode over: long_trip_decisions.keys {
-				float mode_trips <- trip_number * long_trip_decisions[mode];
+			loop mode over: long_trip_decisions_ecotopia.keys {
+				float mode_trips <- trip_number * long_trip_decisions_ecotopia[mode];
 				tick_trips_by_mode[mode] <- tick_trips_by_mode[mode] + mode_trips;
 			}
 			// process energy consumption for each mode
 			ask my_tgvs {
+				float nb_trips <- myself.tick_trips_by_mode["trip_tgv"];
 				int passengers_per_trip <- ref_vehicle.max_passenger_capacity;
-				float total_km <- myself.tick_trips_by_mode["trip_tgv"] * myself.avg_long_trip_distance;
+				float nb_trips_tgv <- nb_trips/passengers_per_trip;
+				
+				float total_km <- nb_trips_tgv * myself.avg_long_trip_distance;
 				float energy_consumed <- total_km * ref_vehicle.consumption_per_km;
 				myself.tick_energy_consumption["trip_tgv"] <- myself.tick_energy_consumption["trip_tgv"] + energy_consumed;
 			}
 			ask my_ters {
+				float nb_trips <- myself.tick_trips_by_mode["trip_ter"];
 				int passengers_per_trip <- ref_vehicle.max_passenger_capacity;
-				float total_km <- myself.tick_trips_by_mode["trip_ter"] * myself.avg_long_trip_distance;
+				float nb_trips_ter <- nb_trips/passengers_per_trip;
+				
+				float total_km <- nb_trips_ter * myself.avg_long_trip_distance;
 				float energy_consumed <- total_km * ref_vehicle.consumption_per_km;
 				myself.tick_energy_consumption["trip_ter"] <- myself.tick_energy_consumption["trip_ter"] + energy_consumed;
 			}
 			ask my_taxis {
+				float nb_trips <- myself.tick_trips_by_mode["trip_taxi"];
 				int passengers_per_trip <- ref_vehicle.max_passenger_capacity;
-				float total_km <- myself.tick_trips_by_mode["trip_taxi"] * myself.avg_long_trip_distance;
+				float nb_trips_taxi <- nb_trips/passengers_per_trip;
+				
+				float total_km <- nb_trips_taxi * myself.avg_long_trip_distance;
 				float energy_consumed <- total_km * ref_vehicle.consumption_per_km;
 				myself.tick_energy_consumption["trip_taxi"] <- myself.tick_energy_consumption["trip_taxi"] + energy_consumed;
 			}
 		}
 		action reset_tick_counters {
-			loop mode over: long_trip_decisions.keys {
+			loop mode over: long_trip_decisions_ecotopia.keys {
 				tick_trips_by_mode[mode] <- 0.0;
 				tick_energy_consumption[mode] <- 0.0;
 			}
@@ -379,8 +398,11 @@ species transport parent:bloc{
 			}
 			// process energy consumption for each mode
 			ask my_minibuses {
+				float nb_trips <- myself.tick_trips_by_mode["trip_minibus"];
 				int passengers_per_trip <- ref_vehicle.max_passenger_capacity;
-				float total_km <- myself.tick_trips_by_mode["trip_minibus"] * myself.avg_short_trip_distance;
+				float nb_trips_minibus <- nb_trips/passengers_per_trip;
+				
+				float total_km <- nb_trips_minibus * myself.avg_short_trip_distance;
 				float energy_consumed <- (total_km / passengers_per_trip) * ref_vehicle.consumption_per_km;
 				myself.tick_energy_consumption["trip_minibus"] <- myself.tick_energy_consumption["trip_minibus"] + energy_consumed;
 			}
