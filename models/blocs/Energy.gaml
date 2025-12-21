@@ -82,6 +82,10 @@ global{
 	map<string, float> tick_resources_used_E <- [];
 	map<string, float> tick_emissions_E <- [];
 	map<string, float> tick_stock_E <- [];
+	float tick_external_demand_E <- 0.0;
+	float surplus <- 0.0;
+	float tick_total_cons <- 0.0;
+	float tick_consommee <- 0.0;
 	
 	//macro
 	 map<string, float> mix_E <- ["nuclear"::0.40, "wind"::0.25, "hydro"::0.20, "solar"::0.15];
@@ -322,6 +326,7 @@ species energy parent:bloc{
 		map<string, float> tick_resources_used <- (map<string, float>([]));
 		map<string, float> tick_production <- (map<string, float>([]));
 		map<string, float> tick_emissions <- (map<string, float>([]));
+		float tick_external_demand;
 		
 		map<string, bloc> ext_producers <- [];
 		
@@ -338,6 +343,10 @@ species energy parent:bloc{
 			return tick_emissions;
 		}
 		
+		float get_tick_external_demand{
+			return tick_external_demand;
+		}
+		
 		//SETTER
 		action set_tick_resources_used(map<string, float> new_resources) {
 			tick_resources_used["m² land"] <- new_resources["m² land"];
@@ -348,6 +357,10 @@ species energy parent:bloc{
 	    }
 	    action set_tick_emissions(map<string, float> new_resources) {
 	        tick_emissions <- new_resources;
+	    }
+	    
+	    action add_tick_external_demand(float add_demand){
+	    	tick_external_demand <- tick_external_demand + add_demand;
 	    }
 	
 		//RESET
@@ -361,6 +374,15 @@ species energy parent:bloc{
 			loop e over: production_emissions_E{
 				tick_emissions[e] <- 0.0;
 			}
+			tick_external_demand_E <- 0.0;
+			tick_consommee <- 0.0;
+		}
+		
+		action count_graph{
+			loop c over: production_outputs_E{
+				tick_total_cons <- tick_external_demand_E + tick_pop_consumption_E[c];
+			}
+			surplus <- tick_production_E["kWh energy"] - tick_total_cons;
 		}
 		
 		//PRODUCE
@@ -369,6 +391,8 @@ species energy parent:bloc{
 			bool ok <- true;
 			loop energy_type over: demand.keys{
 				ask energy{
+					tick_external_demand_E <- tick_external_demand_E + demand[energy_type];
+					write "neeeeddddsssss"+"  "+ demand+ demand.keys +"combien"+ demand[energy_type]+"/////"+stock_E[energy_type];
 					if(demand[energy_type] > stock_E[energy_type]){
 						ok <- false;
 					}
@@ -378,10 +402,17 @@ species energy parent:bloc{
 			if(ok){
 				loop energy_type over: demand.keys {
 					ask energy {
+						write "Energy - Demand External" +demand[energy_type];
+						//write "stock" +stock_E[energy_type];
+						//write "nee222222" + demand+ demand.keys +"combien"+ demand[energy_type]+"/////"+stock_E[energy_type];
 						stock_E[energy_type] <- stock_E[energy_type] - demand[energy_type];
+						tick_consommee <- tick_consommee + demand[energy_type];
+						write "Energy - Stock" +stock_E[energy_type];
 					}
 				}
 			}
+			do count_graph();
+			//write "STATS"+tick_production["kWh energy"] +tick_resources_used["L water"] +tick_emissions_E["gCO2e emissions"];
 			return ok;		        
 		}
 		
@@ -391,9 +422,7 @@ species energy parent:bloc{
 			map<string, float> prod <- (map<string, float>([]));
 		    map<string, float> poll <- (map<string, float>([]));
 			ask energy {
-					// Energie
-					
-					//stock a zero pour debut de tick
+		
 					stock_E["kWh energy"] <- 0.0;
 					
 		            map<string, float> production_by_type <- get_production_by_type();
@@ -434,6 +463,7 @@ species energy parent:bloc{
 		 	if(av){
 		 		ask energy{
 		 			stock_E["kWh energy"] <- stock_E["kWh energy"] + prod["kWh energy"];
+		 			//write stock_E["kWh energy"];
 		 		}
 		 		
 		 		//write "tick prod"+tick_production["kWh energy"];
@@ -449,7 +479,7 @@ species energy parent:bloc{
 		   		do set_tick_emissions(poll);
 		   		
 		 		
-		 		// write "E - Production succeed."+ tick_production["kWh energy"];
+		 		write "E - Production succeed."+ tick_production["kWh energy"];
 		 	}else{
 		 		write "E - Production failed.";
 		 	}
@@ -513,10 +543,14 @@ experiment run_energy type: gui {
     
     output {
 		display Energy_information {
-			chart "Population direct consumption" type: series  size: {0.5,0.5} position: {0, 0} {
-			    loop c over: production_outputs_E{
-			    	data c value: tick_pop_consumption_E[c]; // note : products consumed by other blocs NOT included here (only population direct consumption)
-			    }
+			chart "Ecart Production / Consommation" type: series  size: {0.5,0.5} position: {0, 0} {
+			    //loop c over: production_outputs_E{
+			    	//data "Pop conso "+c value: tick_pop_consumption_E[c]; // note : products consumed by other blocs NOT included here (only population direct consumption)
+			    //}
+			    data "Demande" value: tick_external_demand_E color: #black;
+			    data "Consommation" value: tick_consommee color: #blue;
+			    data "Production" value: tick_production_E["kWh energy"] color: #green;
+			    data "Différence" value: surplus color: #red;
 			}
 			chart "Production par type d'énergie (kWh)" type: series  size: {0.5,0.5} position: {0.5, 0} {
 			    data "Nucléaire" value: tick_production_E["nuclear"] color: #red;
