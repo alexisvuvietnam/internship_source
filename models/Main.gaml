@@ -169,6 +169,39 @@ experiment main_experiment type: gui {
 				data "Agriculture" value: world.tick_resources_used_A["L water"] color: #orange;
 				data "Énergie" value: world.tick_resources_used_E["L water"] color: #yellow;
 			}
+
+		}
+
+		display "Évolution de la consommation d'eau pour chaque secteur" type: 2d {
+			chart "Évolution de la consommation d'eau pour chaque secteur" type: series {
+				data "Agriculture" value: world.tick_resources_used_A["L water"] color: #orange;
+				data "Énergie" value: world.tick_resources_used_E["L water"] color: #yellow;
+			}
+
+		}
+
+		// Affichage des GES
+		display "Répartition de la production de GES pour chaque secteur" type: 2d {
+			chart "Quantité de GES émis pour chaque secteur (en grammes)" type: pie {
+				data "Agriculture" value: world.tick_emissions_A["gCO2e emissions"] color: #orange;
+				data "Urbanisme" value: world.tick_emissions_U["gCO2e emissions"] color: #gray;
+				data "Energie" value: world.tick_emissions_E["gCO2e emissions"] color: #yellow;
+			}
+
+		}
+
+		display "Évolution de l'émission de GES pour chaque secteur" type: 2d {
+			chart "Évolution de l'émission de GES pour chaque secteur (en grammes)" type: series {
+				data "Agriculture" value: world.tick_emissions_A["gCO2e emissions"] color: #orange;
+				data "Urbanisme" value: world.tick_emissions_U["gCO2e emissions"] color: #gray;
+				data "Energie" value: world.tick_emissions_E["gCO2e emissions"] color: #yellow;
+				data "Transport" value: world.tick_emissions_T["gCO2e emissions"] color: #blue;
+				data "Environnement" value: world.tick_absorbed_ECO["gCO2e emissions"] color: #green; // Ne s'affiche pas pour les données négatives
+				data "Total" value:
+				world.tick_emissions_A["gCO2e emissions"] + world.tick_emissions_U["gCO2e emissions"] + world.tick_emissions_E["gCO2e emissions"] + world.tick_emissions_T["gCO2e emissions"] + world.tick_absorbed_ECO["gCO2e emissions"]
+				color: #black;
+			}
+
 		}
 
 		display "Évolution de la consommation d'eau pour chaque secteur" type: 2d {
