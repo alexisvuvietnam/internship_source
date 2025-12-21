@@ -42,7 +42,7 @@ global{
 	
 	/* Seasonal multipliers */
 	/* Seasons: 0-2=Winter, 3-5=Spring, 6-8=Summer, 9-11=Autumn */
-	// data to check to adjust
+	// data to check to adjust for meat
 	map<string, list<float>> season_multipliers <- [
 		"kg_meat"::[0.85, 0.85, 0.85, 1.0, 1.0, 1.0, 1.15, 1.15, 1.15, 1.0, 1.0, 1.0], 
 		"kg_vegetables"::[0.5, 0.5, 0.8, 0.8, 1.2, 1.3, 1.4, 1.3, 1.2, 1.0, 0.7, 0.6]    
@@ -235,8 +235,8 @@ species agricultural parent:bloc{
 			external_producers[product] <- bloc_agent;
 		}
 		
+		// Calculate monthly production based on allocated surface and seasonal/climate factors
 		action produce_from_land{
-			// Calculate monthly production based on allocated surface and seasonal/climate factors
 			loop c over: production_outputs_A{
 				float surface <- 0.0;
 				if (c = "kg_meat"){
@@ -269,6 +269,10 @@ species agricultural parent:bloc{
 			loop e over: production_emissions_A{
 				tick_emissions[e] <- 0.0;
 			}
+			stock_veg <- 0.0;
+			stock_meat <- 0.0;
+			surface_veg <- 0.0;
+			surface_meat <- 0.0;
 		}
 		
 		/* calculate yield of a land takes into account the month and a random climate factor to represent dry or flood */
@@ -311,20 +315,6 @@ species agricultural parent:bloc{
 					}else{
 						//write "not exist u = " + u;
 					}
-					// every year we ask surface_needed
-					
-					/*if (tick_counter=0){
-						if (external_producers.keys contains u){
-							bool av <- external_producers["m² land"].producer.produce(["m² land"::surface_veg+surface_meat]);
-							if not av{
-								ok_surface <- false;
-							}else{
-								float surface_veg <- surface_veg + indivudual_consumption_A["kg_vegetables"]*production_output_inputs_A["kg_vegetables"]["m² land"];
-								float surface_meat <- surface_meat + indivudual_consumption_A["kg_meat"]*production_output_inputs_A["kg_meat"]["m² land"];
-							}
-						
-						}
-					}*/
 				}
 				loop e over: production_emissions_A{ // apply emissions
 					float quantity_emitted <- production_output_emissions_A[c][e] * demand[c];
