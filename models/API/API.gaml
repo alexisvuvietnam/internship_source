@@ -280,7 +280,7 @@ species coordinator{
 
 		list<human> pop <- get_all_instances(human);	
 
-
+		
 		loop bloc_name over: scheduling{ // move to next tick for all blocs, following the defined scheduling
 			if bloc_name in registered_blocs.keys{
 				ask registered_blocs[bloc_name]{

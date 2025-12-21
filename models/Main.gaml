@@ -10,7 +10,6 @@ import "API/API.gaml"
 import "blocs/Demography.gaml"
 import "blocs/Agricultural.gaml"
 import "blocs/Energy.gaml"
-import "blocs/Transport_GIS.gaml"
 import "blocs/Transport.gaml"
 import "blocs/Urbanplanning.gaml"
 import "blocs/Ecosystem.gaml"
@@ -63,12 +62,6 @@ global{
 			}
 			write "Total de mini-villes créées: " + length(all_mini_cities);
 			write "Total de villes créées: " + length(all_main_cities);
-			
-			create transport_gis number:1 with: [
-				city_population::city_population,
-				main_cities::all_main_cities,
-				mini_cities::all_mini_cities
-			];
 		}
 		
 		// instanciate the blocs (E, A and R blocs here):
@@ -107,7 +100,6 @@ experiment display_gis type: gui {
 			// species city aspect: base ;
 			species main_city aspect: default;
 			species mini_city aspect: default;
-			species transport_link aspect: type;
 		}
 	}
 }
