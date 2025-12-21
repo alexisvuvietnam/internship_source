@@ -21,8 +21,8 @@ global {
 	list<string> production_emissions_ECO <- ["gCO2e emissions"]; // émissions absorbées (négatives)
 
 	/* Le stock des différentes ressources naturelles à l'initialisation (cad la France de 2022) */
-	float stock_wood <- 3.1; // en milliards
-	float stock_meat <- 150.0 * 1; // en millions
+	float stock_wood <- 3100000000.0; // 3,1 millards de bois
+	float stock_meat <- 150.0 * 1000000.0; // 1 million de sangliers de 150kg
 	float total_surface <- 5.44e11; // Surface de la France métropolitaine en m2
 	float forest_surface <- 1.71e11; // La forêt correspond à 171 000 km2 (m2)
 	/*  Surface dispo pour les autres secteurs  après avoir retiré la surface de la forêt de base */
@@ -100,6 +100,8 @@ species environnement parent: bloc {
 		if (cycle > 0) { // skip it the first tick
 			tick_production_ECO <- producer.get_tick_outputs_produced(); // collect production
 			tick_absorbed_ECO <- producer.get_tick_emissions(); // collect emissions
+			//			write "tick_production_ECO: " + tick_production_ECO;
+			//			write "tick_absorded_ECO: " + tick_absorbed_ECO;
 			ask eco_producer { // prepare next tick on producer side
 				do reset_tick_counters;
 			}
@@ -122,7 +124,7 @@ species environnement parent: bloc {
 	species eco_producer parent: production_agent {
 		map<string, float> tick_resources_used <- [];
 		map<string, float> tick_production <- [];
-		map<string, float> tick_emissions <- 0.0;
+		map<string, float> tick_emissions <- [];
 		float last_wood_variation <- 0.0;
 		float last_water_variation <- 0.0;
 
@@ -134,11 +136,8 @@ species environnement parent: bloc {
 
 		/******** RESET DES COMPTEURS POUR LE NOUVEAU TICK ********/
 		action reset_tick_counters {
-			tick_production["m3_wood"] <- 0.0;
-			tick_production["L water"] <- 0.0;
-			tick_production["kg_meat"] <- 0.0;
-			tick_production["m² land"] <- 0.0;
-			tick_emissions["gCO2e emissions"] <- 0.0;
+			tick_production <- ["m3_wood"::0.0, "L water"::0.0, "kg_meat"::0.0, "m² land"::0.0];
+			tick_emissions <- ["gCO2e emissions"::0.0];
 		}
 
 		/******** PRODUCTION DE RESSOURCES (DEMANDES DES AUTRES SECTEURS) ********/
@@ -148,7 +147,10 @@ species environnement parent: bloc {
 
 				/* Production de bois */
 				if (r = "m3_wood") {
+					// write "Demande de " + qty + " de " + r;
+					// write "stock_wood: " + stock_wood;
 					if (stock_wood >= qty) {
+						// write "Demande de " + qty + " de m3 de bois";
 						stock_wood <- stock_wood - qty;
 						tick_production[r] <- tick_production[r] + qty;
 					} else {
@@ -239,11 +241,29 @@ experiment run_ecosystem type: gui {
 			}
 
 			chart "Évolution de la surface dispo (en m2)" type: series size: {0.5, 0.5} position: {0.5, 0} {
-				data "Surface libre" value: available_surface color: #aqua;
+				data "Surface libre" value: available_surface color: #yellow;
 			}
 
 		}
 
+		//		display Ecosystem_demand_information type: 2d {
+		//			chart "Quantité d'utilisation du bois à chaque tick" type: series size: {0.5, 0.5} position: {0, 0} {
+		//				data "Bois" value: tick_production_ECO["m3_wood"] color: #brown;
+		//			}
+		//
+		//			chart "Quantité d'utilisation de viande à chaque tick" type: series size: {0.5, 0.5} position: {0, 0.5} {
+		//				data "Viande" value: tick_production_ECO["kg_meat"] color: #darkred;
+		//			}
+		//
+		//			chart "Quantité d'utilisation d'eau à chaque tick" type: series size: {0.5, 0.5} position: {0.5, 0} {
+		//				data "Eau" value: tick_production_ECO["L water"] color: #aqua;
+		//			}
+		//
+		//			chart "Quantité de GES absorbée à chaque tick" type: series size: {0.5, 0.5} position: {0.5, 0.5} {
+		//				data "GES" value: tick_absorbed_ECO["gCO2e emissions"] color: #black;
+		//			}
+		//
+		//		}
 		display Ecosystem_demand_information type: 2d {
 			chart "Quantité d'utilisation du bois à chaque tick" type: series size: {0.5, 0.5} position: {0, 0} {
 				data "Bois" value: tick_production_ECO["m3_wood"] color: #brown;
@@ -263,6 +283,10 @@ experiment run_ecosystem type: gui {
 
 		}
 
+		monitor "Bois" value: tick_production_ECO["m3_wood"];
+		monitor "Viande" value: tick_production_ECO["kg_meat"];
+		monitor "Eau" value: tick_production_ECO["L water"];
+		monitor "GES" value: tick_absorbed_ECO["gCO2e emissions"];
 		display Surface_usage type: 2d {
 			chart "Utilisation de la surface pour chaque secteur (en km2)" type: pie {
 				data "Forêt" value: forest_surface / 1e6 color: #green;
