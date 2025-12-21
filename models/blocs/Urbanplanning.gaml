@@ -11,7 +11,7 @@ import "../API/API.gaml"
 global {
 /* Setup */
 // TODO : adapter les productions et les ressources demandées sur les vrais variables et valeurs
-	list<string> production_inputs_U <- ["m3_wood", "kWh energy", "kg_coton", "m² land"];
+	list<string> production_inputs_U <- ["m3_wood", "Wh energy", "kg_coton", "m² land"];
 	list<string> production_outputs_U <- ["modular_house_lobby", "modular_house_extension", "wooden_building"];
 	list<string> autoproduction_U <- ["kg_plastic"];
 	list<string> production_emissions_U <- ["gCO2e emissions"];
@@ -19,7 +19,7 @@ global {
 	/* Production data */
 	// TODO : adapter les production et le cout de celle ci sur les bonnes
 	map<string, map<string, float>>
-	production_output_inputs_U <- ["modular_house_lobby"::["m3_wood"::0.0, "kg_plastic"::3000.0], "modular_house_extension"::["m3_wood"::0.0, "kg_plastic"::600.0], "wooden_building"::["m3_wood"::80.0, "kg_plastic"::0.0], "plastic_factory"::["m3_wood"::184000.0, "kg_plastic"::42000000.0], "kg_plastic"::["kg_coton"::16.5, "kWh energy"::6.0]];
+	production_output_inputs_U <- ["modular_house_lobby"::["m3_wood"::0.0, "kg_plastic"::3000.0], "modular_house_extension"::["m3_wood"::0.0, "kg_plastic"::600.0], "wooden_building"::["m3_wood"::80.0, "kg_plastic"::0.0], "plastic_factory"::["m3_wood"::184000.0, "kg_plastic"::42000000.0], "kg_plastic"::["kg_coton"::16.5, "Wh energy"::6.0]];
 	map<string, map<string, float>>
 	production_output_emissions_U <- ["modular_house_lobby"::["gCO2e emissions"::1000000.0], "modular_house_extension"::["gCO2e emissions"::30000.0], "wooden_building"::["gCO2e emissions"::300000.0], "plastic_factory"::["gCO2e emissions"::50000000.0], "kg_plastic"::["gCO2e emissions"::0.0]];
 	map<string, map<string, float>>
@@ -259,6 +259,10 @@ species urbanplanning parent: bloc {
 
 					tick_production[a] <- tick_production[a] + quantity_needed;
 					tick_resources_used[a] <- tick_resources_used[a] + quantity_needed;
+					loop u over: production_output_inputs_U[a].keys {
+						tick_resources_used[u] <- tick_resources_used[u] + production_output_inputs_U[a][u] * quantity_needed;
+					}
+
 				}
 
 				loop e over: production_emissions_U { // apply emissions
@@ -355,9 +359,35 @@ species urbanplanning parent: bloc {
  * If needed, a new experiment combining all those displays should be added, for example in the Main code of the simulation.
  */
 experiment run_urban type: gui {
+
+	reflex {
+		loop i over: production_inputs_U {
+		/*if(not(i = "kg_coton")){
+				save [cycle, i, tick_resources_used_U[i]] to: "results_files/urbanplanning/urban_ressources.csv" rewrite: false;
+			}*/
+			save [cycle, i, tick_resources_used_U[i]] to: "results_files/urbanplanning/urban_ressources.csv" rewrite: false;
+		}
+
+		loop i over: autoproduction_U {
+			save [cycle, i, tick_resources_used_U[i]] to: "results_files/urbanplanning/urban_ressources.csv" rewrite: false;
+		}
+
+		loop o over: production_outputs_U {
+			save [cycle, o, tick_production_U[o]] to: "results_files/urbanplanning/urban_production.csv" rewrite: false;
+		}
+
+		loop o over: production_outputs_U {
+			save [cycle, o, tick_pop_consumption_U[o]] to: "results_files/urbanplanning/urban_consumption.csv" rewrite: false;
+		}
+
+		loop e over: production_emissions_U {
+			save [cycle, e, tick_emissions_U[e]] to: "results_files/urbanplanning/urban_emission.csv" rewrite: false;
+		}
+
+	}
+
 	output {
-		monitor "Tick resources used : " value: tick_resources_used_U["kWh energy"];
-		display Urban_information type: 2d {
+		display Urban_information {
 			chart "Population direct consumption" type: series size: {0.5, 0.5} position: {0, 0} {
 				loop c over: production_outputs_U {
 					data c value: tick_pop_consumption_U[c]; // note : products consumed by other blocs NOT included here (only population direct consumption)
@@ -366,23 +396,21 @@ experiment run_urban type: gui {
 			}
 
 			chart "Total production" type: series size: {0.5, 0.5} position: {0.5, 0} {
-			//loop c over: production_outputs_U{
-			//	data c value: tick_production_U[c];
-			//}
-				loop a over: autoproduction_U {
-					data a value: tick_production_U[a];
+				loop c over: production_outputs_U {
+					data c value: tick_production_U[c];
 				}
-
+				//loop a over: autoproduction_U{
+				//data a value: tick_production_U[a];
+				//}
 			}
 
 			chart "Resources usage" type: series size: {0.5, 0.5} position: {0, 0.5} {
-			//loop r over: production_inputs_U{
-			//	data r value: tick_resources_used_U[r];
-			//}
-				loop a over: autoproduction_U {
-					data a value: tick_resources_used_U[a];
+				loop r over: production_inputs_U {
+					data r value: tick_resources_used_U[r];
 				}
-
+				//loop a over: autoproduction_U{
+				//data a value: tick_resources_used_U[a];
+				//}
 			}
 
 			chart "Production emissions" type: series size: {0.5, 0.5} position: {0.5, 0.5} {
