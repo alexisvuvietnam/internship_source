@@ -11,10 +11,10 @@ import "../API/API.gaml"
 global {
 	/* Setup */
 	list<string> production_inputs_T <- ["kWh energy"];
-	list<string> production_outputs_T <- ["minibus", "train", "truck", "taxi"];
+	list<string> production_outputs_T <- ["minibus", "tgv", "ter", "truck", "taxi"];
 	list<string> production_emissions_T <- ["gCO2e emissions"];
+	list<string> production_trips <- ["trip_minibus", "trip_ter", "trip_tgv", "trip_taxi", "trip_truck"];
 	
-	map<string, float> short_or_long <- ["short"::0.8, "long"::0.2];
 	
 	/* Production data */
 	map<string, map<string, float>> production_outputs_inputs_T <-
@@ -36,9 +36,9 @@ global {
 	map<string, float> tick_resources_used_T <- [];
 	map<string, float> tick_emissions_T <- [];
 	
-	list<string> short_transport <- ["minibus","bike","walking"];
-	list<string> long_transport <- ["tgv", "ter", "taxi"];
-	list<string> transport_name <- ["minibus","tgv","ter","taxi"];
+	list<string> short_transport <- ["trip_minibus","trip_bike","trip_walking"];
+	list<string> long_transport <- ["trip_tgv", "trip_ter", "trip_taxi"];
+	list<string> transport_name <- ["trip_minibus","trip_tgv","trip_ter","trip_taxi"];
 	
 	// trip statistics
 	map<string, float> tick_long_trips <- [];
@@ -66,6 +66,14 @@ species transport parent:bloc{
 	long_trip long <- nil;
 	short_trip short <- nil;
 	
+	//number of long trips or short trips in a month is decided by the hypothesises explained in the paper
+    int short_trips_per_week <- 14; // average of 2 trips per day
+    int long_trips_per_week <- 2;
+    
+    // boolean values to handle shortage
+    bool do_long_trips <- true;
+    bool do_short_trips <- true;
+	
 	action setup{
 		list<transport_producer> producers <- [];
 		list<transport_consumer> consumers <- [];
@@ -81,13 +89,12 @@ species transport parent:bloc{
 	}
 	
 	action tick(list<human> pop){
-		int total_trips <- 10000;
 		do collect_last_tick_data();
-		do population_activity(pop, total_trips);
+		do population_activity(pop);
 	}
 	
 	production_agent get_producer{
-		write "producer inside target bloc : "+producer;
+		write "producer inside target bloc : " + producer;
 		return producer;
 	}
 
@@ -114,50 +121,55 @@ species transport parent:bloc{
 	    	ask long {
 	    		tick_long_trips <- get_tick_trips();
 	    		map<string, float> long_energy <- get_tick_energy();
-	    		// aggregate into global statistics
 	    		loop mode over: long_energy.keys {
 	    			if (tick_trip_energy[mode] = nil) {
 	    				tick_trip_energy[mode] <- 0.0;
 	    			}
-	    			tick_trip_energy[mode] <- tick_trip_energy[mode] + long_energy[mode];
+	    			tick_trip_energy[mode] <- long_energy[mode];
 	    		}
 	    	}
-	    	
 	    	ask short {
 	    		tick_short_trips <- get_tick_trips();
 	    		map<string, float> short_energy <- get_tick_energy();
-	    		// aggregate into global statistics
 	    		loop mode over: short_energy.keys {
 	    			if (tick_trip_energy[mode] = nil) {
 	    				tick_trip_energy[mode] <- 0.0;
 	    			}
-	    			tick_trip_energy[mode] <- tick_trip_energy[mode] + short_energy[mode];
+	    			tick_trip_energy[mode] <- short_energy[mode];
 	    		}
+	    	}
+	    	ask transport_producer {
+	    		do reset_tick_counters;
 	    	}
 	    }
 	}
 	
-	action population_activity(list<human> pop, int nb_trajets) {
+	action population_activity(list<human> pop) {
 	    // calculate trip numbers based on population
-	    int total_trips <- length(pop);
-	    int long_trips <- int(total_trips * short_or_long["long"]);
-	    int short_trips <- int(total_trips * short_or_long["short"]);
+	    // TODO : modify to get the population from demography
+	    int nb_population <- 66352000; // population statique
+	    
+	    float nb_weeks_per_month <- 4.34524;
+	    
+	    int long_trips <- int(nb_population * (nb_weeks_per_month * long_trips_per_week));
+	    int short_trips <- int(nb_population * (nb_weeks_per_month * short_trips_per_week));
 	    
 	    // reset and process trips
 	    ask long {
 	        do reset_tick_counters();
-	        do process_long_trips(long_trips);
+	        if (do_long_trips = true){
+	        	do process_long_trips(long_trips);
+	        }
 	    }
 	    ask short {
 	        do reset_tick_counters();
 	        do process_short_trips(short_trips);
 	    }
 	    ask pop {
-	        ask myself.transport_consumer {
+	        ask myself.consumer {
 	            do consume(myself);
 	        }
 	    }
-	    
 	    ask transport_consumer {
 	        ask transport_producer {
 	            loop c over: myself.consumed.keys {
@@ -168,9 +180,11 @@ species transport parent:bloc{
 	}
 
 	species transport_producer parent:production_agent{
+		map<string, bloc> external_producers <- []; // external producers that provide the needed resources
 		map<string, float> tick_resources_used <- [];
 		map<string, float> tick_production <- [];
 		map<string, float> tick_emissions <- [];
+		
 		
 		map<string, float> get_tick_inputs_used{
 			return tick_resources_used;
@@ -197,29 +211,68 @@ species transport parent:bloc{
 		}
 		
 		bool produce(map<string,float> demand){
-			// TODO : la création de nouvau véhicule
-		    // collect from long trips
-		    ask transport(host).long {
-		        tick_trip_energy <- get_tick_energy();
-		        // sum all energy consumption
-		        loop mode over: tick_trip_energy.keys {
-		            myself.tick_resources_used["kWh energy"] <- 
-		                myself.tick_resources_used["kWh energy"] + tick_trip_energy[mode];
-		        }
-		    }
-		    // collect from short trips
-		    ask transport(host).short {
-		        tick_trip_energy <- get_tick_energy();
-		        // sum all energy consumption
-		        loop mode over: tick_trip_energy.keys {
-		            myself.tick_resources_used["kWh energy"] <- 
-		            	myself.tick_resources_used["kWh energy"] + tick_trip_energy[mode];
-		        }
-		    }
-		    return true;
+			bool ok_trips <- true;
+			bool ok_build <- true;
+			loop c over: demand.keys{
+				if (production_trips contains c) { // demande d'energie pour des trajets
+		            loop u over: production_inputs_T {
+		            	float quantity_needed <- 0.0;
+		            	if (c in production_trips){
+	            			quantity_needed <- tick_trip_energy[c];
+	            		}
+						tick_resources_used[u] <- tick_resources_used[u] + quantity_needed;
+						if(external_producers.keys contains u){
+							bool av <- external_producers[u].producer.produce([u::quantity_needed]);
+							if not av{
+								ok_trips <- false; // if unable to produce enough electricity for trips
+								// in case of a shortage, we prioritise short trips over long trips
+								if (do_long_trips = true){
+									do_long_trips <- false;
+								}
+								else if (do_short_trips = true){
+									do_short_trips <-false; // setting the short trips to false will only set the minibus usage to 0
+								}
+							}
+							// recovery from shortage
+							else if (do_short_trips = false) {
+								do_short_trips <- true;
+							}
+							else if (do_long_trips = false) {
+								do_long_trips <- true;
+							}
+						}
+					}
+				}
+				// unused demands for now
+				else if (production_outputs_inputs_T.keys contains c) { // demande de ressources pour de la fabrication
+		            loop u over: production_inputs_T {
+		            	float quantity_needed <- 0.0;
+	            		// TODO: implémenter la logique de besoin de fabrication
+	            		if (production_outputs_inputs_T[c].keys contains u) {
+							quantity_needed <- production_outputs_inputs_T[c][u] * demand[c];
+						}
+						tick_resources_used[u] <- tick_resources_used[u] + quantity_needed;
+						if(external_producers.keys contains u){
+							bool av <- external_producers[u].producer.produce([u::quantity_needed]);
+							if not av{
+								ok_build <- false;
+							}
+						}
+					}
+					loop e over: production_emissions_T{
+						if (production_output_emissions_T[c].keys contains e) {
+							float quantity_emitted <- production_output_emissions_T[c][e] * demand[c];
+							tick_emissions[e] <- tick_emissions[e] + quantity_emitted;
+						}
+					}
+					tick_production[c] <- tick_production[c] + demand[c];
+				}
+			}
+		    return ok_trips;
 		}
 		action set_supplier(string product, bloc bloc_agent){
-			// do nothing
+			write name +": external producer " + bloc_agent + " set for " + product;
+			external_producers[product] <- bloc_agent;
 		}
 	}
 	
@@ -232,6 +285,11 @@ species transport parent:bloc{
 			loop c over: production_outputs_T{
 				consumed[c] <- 0;
 			}
+			consumed["trip_tgv"] <- 0.0;
+			consumed["trip_ter"] <- 0.0;
+			consumed["trip_taxi"] <- 0.0;
+			consumed["trip_minibus"] <- 0.0;
+			consumed["trip_truck"] <- 0.0;
 		}
 		action reset_tick_counters{ // reset choices counters
     		loop c over: consumed.keys{
@@ -239,42 +297,38 @@ species transport parent:bloc{
     		}
 		}
 		action consume(human h) {
-		    // collect from long_trip
 		    ask transport(host).long {
-		        map<string, float> trips <- get_tick_trips();
-		        // combine TGV and TER into train
-		        if trips contains_key "tgv" or trips contains_key "ter" {
-		            float train_trips <- (trips contains_key "tgv" ? trips["tgv"] : 0.0) + 
-		                                 (trips contains_key "ter" ? trips["ter"] : 0.0);
-		            myself.consumed["train"] <- myself.consumed["train"] + train_trips;
-		        }
-		        // track taxi trips
-		        if trips contains_key "taxi" {
-		            myself.consumed["taxi"] <- myself.consumed["taxi"] + trips["taxi"];
-		        }
-		    }
-		    // collect from short_trip
+				map<string, float> trips <- get_tick_energy();
+		        if (trips contains_key "trip_tgv") {
+		        	myself.consumed["trip_tgv"] <- myself.consumed["trip_tgv"] + trips["trip_tgv"];
+				}
+		        if (trips contains_key "trip_ter") {
+		        	myself.consumed["trip_ter"] <- myself.consumed["trip_ter"] + trips["trip_ter"];
+				}
+				if (trips contains_key "trip_taxi") {
+		        	myself.consumed["trip_taxi"] <- myself.consumed["trip_taxi"] + trips["trip_taxi"];
+				}
+			}
 		    ask transport(host).short {
-		        map<string, float> trips <- get_tick_trips();
-		        if trips contains_key "minibus" {
-		            myself.consumed["minibus"] <- myself.consumed["minibus"] + trips["minibus"];
-		        }
+				map<string, float> trips <- get_tick_energy();
+				if (trips contains_key "trip_minibus") {
+					myself.consumed["trip_minibus"] <- myself.consumed["trip_minibus"] + trips["trip_minibus"];
+				}
 			}
 		}
 	}
 	
 	species long_trip{
-		map<string, float> long_trip_decisions <- ["tgv"::0.3,"ter"::0.5,"taxi"::0.2];
-		float avg_long_trip_distance <- 500.0; // km - average distance for long trips
-		
+		map<string, float> long_trip_decisions_france_data <- ["trip_tgv"::0.01845,"trip_ter"::0.13205,"trip_taxi"::0.8495];
+		map<string, float> long_trip_decisions_ecotopia <- ["trip_tgv"::0.60,"trip_ter"::0.40,"trip_taxi"::0.10];
+		float avg_long_trip_distance <- 662.0#km; // average distance for long trips
 		taxis my_taxis <- nil;
 		ters my_ters <- nil;
 		tgvs my_tgvs <- nil;
 		
 		// tick statistics
-		map<string, float> tick_trips_by_mode <- ["tgv"::0.0, "ter"::0.0, "taxi"::0.0];
-		map<string, float> tick_energy_consumption <- ["tgv"::0.0, "ter"::0.0, "taxi"::0.0];
-		map<string, float> tick_emissions <- ["tgv"::0.0, "ter"::0.0, "taxi"::0.0];
+		map<string, float> tick_trips_by_mode <- ["trip_tgv"::0.0, "trip_ter"::0.0, "trip_taxi"::0.0];
+		map<string, float> tick_energy_consumption <- ["trip_tgv"::0.0, "trip_ter"::0.0, "trip_taxi"::0.0];
 		
 		init {
 			create taxis number:1;
@@ -287,35 +341,41 @@ species transport parent:bloc{
 		
 		action process_long_trips(int trip_number){
 			// distribute trips according to probabilities
-			loop mode over: long_trip_decisions.keys {
-				float mode_trips <- trip_number * long_trip_decisions[mode];
+			loop mode over: long_trip_decisions_ecotopia.keys {
+				float mode_trips <- trip_number * long_trip_decisions_ecotopia[mode];
 				tick_trips_by_mode[mode] <- tick_trips_by_mode[mode] + mode_trips;
 			}
-			// calculate energy consumption for each mode
+			// process energy consumption for each mode
 			ask my_tgvs {
-				float trips <- myself.tick_trips_by_mode["tgv"];
+				float nb_trips <- myself.tick_trips_by_mode["trip_tgv"];
 				int passengers_per_trip <- ref_vehicle.max_passenger_capacity;
-				float total_km <- trips * myself.avg_long_trip_distance;
-				float energy_consumed <- (total_km / passengers_per_trip) * ref_vehicle.consumption_per_km;
-				myself.tick_energy_consumption["tgv"] <- myself.tick_energy_consumption["tgv"] + energy_consumed;
+				float nb_trips_tgv <- nb_trips/passengers_per_trip;
+				
+				float total_km <- nb_trips_tgv * myself.avg_long_trip_distance;
+				float energy_consumed <- total_km * ref_vehicle.consumption_per_km;
+				myself.tick_energy_consumption["trip_tgv"] <- myself.tick_energy_consumption["trip_tgv"] + energy_consumed;
 			}
 			ask my_ters {
-				float trips <- myself.tick_trips_by_mode["ter"];
+				float nb_trips <- myself.tick_trips_by_mode["trip_ter"];
 				int passengers_per_trip <- ref_vehicle.max_passenger_capacity;
-				float total_km <- trips * myself.avg_long_trip_distance;
-				float energy_consumed <- (total_km / passengers_per_trip) * ref_vehicle.consumption_per_km;
-				myself.tick_energy_consumption["ter"] <- myself.tick_energy_consumption["ter"] + energy_consumed;
+				float nb_trips_ter <- nb_trips/passengers_per_trip;
+				
+				float total_km <- nb_trips_ter * myself.avg_long_trip_distance;
+				float energy_consumed <- total_km * ref_vehicle.consumption_per_km;
+				myself.tick_energy_consumption["trip_ter"] <- myself.tick_energy_consumption["trip_ter"] + energy_consumed;
 			}
 			ask my_taxis {
-				float trips <- myself.tick_trips_by_mode["taxi"];
+				float nb_trips <- myself.tick_trips_by_mode["trip_taxi"];
 				int passengers_per_trip <- ref_vehicle.max_passenger_capacity;
-				float total_km <- trips * myself.avg_long_trip_distance;
-				float energy_consumed <- (total_km / passengers_per_trip) * ref_vehicle.consumption_per_km;
-				myself.tick_energy_consumption["taxi"] <- myself.tick_energy_consumption["taxi"] + energy_consumed;
+				float nb_trips_taxi <- nb_trips/passengers_per_trip;
+				
+				float total_km <- nb_trips_taxi * myself.avg_long_trip_distance;
+				float energy_consumed <- total_km * ref_vehicle.consumption_per_km;
+				myself.tick_energy_consumption["trip_taxi"] <- myself.tick_energy_consumption["trip_taxi"] + energy_consumed;
 			}
 		}
 		action reset_tick_counters {
-			loop mode over: long_trip_decisions.keys {
+			loop mode over: long_trip_decisions_ecotopia.keys {
 				tick_trips_by_mode[mode] <- 0.0;
 				tick_energy_consumption[mode] <- 0.0;
 			}
@@ -329,22 +389,23 @@ species transport parent:bloc{
 	}
 	
 	species short_trip{
-		map<string, float> short_trip_decisions <- ["minibus"::0.243,"bike"::0.074,"walking"::0.683];
-		float avg_short_trip_distance <- 5.0; // km - average distance for short trips
-		
+		map<string, float> short_trip_decisions <- ["trip_minibus"::0.243,"trip_bike"::0.074,"trip_walking"::0.683];
+		float avg_short_trip_distance <- 4.0#km; // average distance for short trips
 		minibuses my_minibuses <- nil;
 		bikes my_bikes <- nil;
+		legs my_legs <- nil;
 		
 		// tick statistics
-		map<string, float> tick_trips_by_mode <- ["minibus"::0.0, "bike"::0.0, "walking"::0.0];
-		map<string, float> tick_energy_consumption <- ["minibus"::0.0, "bike"::0.0, "walking"::0.0];
-		map<string, float> tick_emissions <- ["minibus"::0.0, "bike"::0.0, "walking"::0.0];
-		
+		map<string, float> tick_trips_by_mode <- ["trip_minibus"::0.0, "trip_bike"::0.0, "trip_walking"::0.0];
+		map<string, float> tick_energy_consumption <- ["trip_minibus"::0.0, "trip_bike"::0.0, "trip_walking"::0.0];
+
 		init {
 			create minibuses number:1;
 			my_minibuses <- first(minibuses);
 			create bikes number:1;
 			my_bikes <- first(bikes);
+			create legs number:1;
+			my_legs <- first(legs);
 		}
 		action process_short_trips(int trip_number){
 			// distribute trips according to probabilities
@@ -352,21 +413,32 @@ species transport parent:bloc{
 				float mode_trips <- trip_number * short_trip_decisions[mode];
 				tick_trips_by_mode[mode] <- tick_trips_by_mode[mode] + mode_trips;
 			}
-			// calculate energy consumption for each mode
-			ask my_minibuses {
-				float trips <- myself.tick_trips_by_mode["minibus"];
-				int passengers_per_trip <- ref_vehicle.max_passenger_capacity;
-				float total_km <- trips * myself.avg_short_trip_distance;
-				float energy_consumed <- (total_km / passengers_per_trip) * ref_vehicle.consumption_per_km;
-				myself.tick_energy_consumption["minibus"] <- myself.tick_energy_consumption["minibus"] + energy_consumed;
+			// process energy consumption for each mode
+			if (do_short_trips = true){ // handles energy shortage
+				ask my_minibuses {
+					float nb_trips <- myself.tick_trips_by_mode["trip_minibus"];
+					int passengers_per_trip <- ref_vehicle.max_passenger_capacity;
+					float nb_trips_minibus <- nb_trips/passengers_per_trip;
+					
+					float total_km <- nb_trips_minibus * myself.avg_short_trip_distance;
+					float energy_consumed <- (total_km / passengers_per_trip) * ref_vehicle.consumption_per_km;
+					myself.tick_energy_consumption["trip_minibus"] <- myself.tick_energy_consumption["trip_minibus"] + energy_consumed;
+				}
+			}
+			else {
+				ask my_minibuses {
+					myself.tick_energy_consumption["trip_minibus"] <- 0.0;	
+				}
 			}
 			ask my_bikes {
-				float trips <- myself.tick_trips_by_mode["bike"];
 				// bikes have no energy consumption
-				myself.tick_energy_consumption["bike"] <- 0.0;
+				myself.tick_energy_consumption["trip_bike"] <- 0.0;
 			}
-			// walking has no energy consumption
-			tick_energy_consumption["walking"] <- 0.0;
+			ask my_bikes {
+				// walking has no energy consumption
+				myself.tick_energy_consumption["trip_walking"] <- 0.0;
+			}
+			
 		}
 		
 		action reset_tick_counters {
@@ -506,6 +578,14 @@ species bikes parent:transport_mode {
 		ref_vehicle <- first(bike_vehicle);
 	}
 }
+species legs parent:transport_mode {
+	init{
+		type <- "legs";
+		number_available <- nil;
+		create legs_vehicle number:1;
+		ref_vehicle <- first(legs_vehicle);
+	}
+}
 species trucks parent:transport_mode {
 	truck_vehicle truck <- nil;
 	init{
@@ -524,49 +604,77 @@ species trucks parent:transport_mode {
  * If needed, a new experiment combining all those displays should be added, for example in the Main code of the simulation.
  */
 experiment run_transport type: gui {
+	reflex save_results {
+		loop c over: production_outputs_T {
+            save
+                [cycle, c, tick_pop_consumption_T[c]]
+            to: "results_files/transport/transport_consumption.csv" format: "csv" rewrite: false; // Pensez à supprimer les anciens fichiers entre deux experiments
+        }
+        loop c over: production_outputs_T {
+            save
+                [cycle, c, tick_production_T[c]]
+            to: "results_files/transport/transport_production.csv" format: "csv" rewrite: false;
+        }
+        loop r over: production_inputs_T {
+            save
+                [cycle, r, tick_resources_used_T[r]]
+            to: "results_files/transport/transport_ressources.csv" format: "csv" rewrite: false;
+        }
+        loop e over: production_emissions_T {
+            save
+                [cycle, e, tick_emissions_T[e]]
+            to: "results_files/transport/transport_emissions.csv" format: "csv" rewrite: false;
+        }
+        loop mode over: long_transport {
+            save
+                [cycle, mode, tick_long_trips[mode]]
+            to: "results_files/transport/transport_long_trips.csv" format: "csv" rewrite: false;
+        }
+        loop mode over: short_transport {
+            save
+                [cycle, mode, tick_short_trips[mode]]
+            to: "results_files/transport/transport_short_trips.csv" format: "csv" rewrite: false;
+        }
+        loop mode over: transport_name {
+            save
+                [cycle, mode, tick_trip_energy[mode]]
+            to: "results_files/transport/transport_trip_energy.csv" format: "csv" rewrite: false;
+        }
+	}
 	output {
 		display Transport_information type: 2d{
-			chart "Population direct consumption" type: series  size: {0.5,0.5} position: {0, 0} {
-			    loop c over: production_outputs_T{
-			    	data c value: tick_pop_consumption_T[c]; // note : products consumed by other blocs NOT included here (only population direct consumption)
-			    }
+			
+			chart "Energy consumption by mode" type: series size: {0.5,0.5} position: {0, 0.5} {
+			    loop mode over: transport_name {
+	    			data mode value: tick_trip_energy[mode];
+	    		}
+			    data "total" value: tick_resources_used_T["kWh energy"];
 			}
-			chart "Total production" type: series  size: {0.5,0.5} position: {0.5, 0} {
-			    loop c over: production_outputs_T{
-			    	data c value: tick_production_T[c];
-			    }
-			}
-			chart "Resources usage" type: series size: {0.5,0.5} position: {0, 0.5} {
-			    loop r over: production_inputs_T{
-			    	data r value: tick_resources_used_T[r];
-			    }
-			}
-			chart "Production emissions" type: series size: {0.5,0.5} position: {0.5, 0.5} {
-			    loop e over: production_emissions_T{
-			    	data e value: tick_emissions_T[e];
-			    }
-			}
-	    }
-	}
-}
-experiment run_transport_trips type: gui {
-	output {
-		display Trip_Statistics {
-	    	chart "Long trips by mode" type: series size: {0.5,0.5} position: {0, 0} {
+			chart "Number of long trips by mode" type: series size: {0.5,0.5} position: {0, 0} {
 	    		loop mode over: long_transport {
 	    			data mode value: tick_long_trips[mode];
 	    		}
 	    	}
-	    	chart "Short trips by mode" type: series size: {0.5,0.5} position: {0.5, 0} {
+	    	chart "Number of short trips by mode" type: series size: {0.5,0.5} position: {0.5, 0} {
 	    		loop mode over: short_transport {
 	    			data mode value: tick_short_trips[mode];
 	    		}
 	    	}
-	    	chart "Energy consumption by mode (kWh)" type: series size: {0.5,0.5} position: {0, 0.5} {
-	    		loop mode over: transport_name {
-	    			data mode value: tick_trip_energy[mode];
-	    		}
-	    	}
+	    	chart "Production emissions" type: series size: {0.5,0.5} position: {0.5, 0.5} {
+			    loop e over: production_emissions_T{
+			    	data e value: tick_emissions_T[e];
+			    }
+			}
+//	    	chart "Population direct consumption" type: series  size: {0.5,0.5} position: {0, 0} {
+//			    loop c over: production_outputs_T{
+//			    	data c value: tick_pop_consumption_T[c]; // note : products consumed by other blocs NOT included here (only population direct consumption)
+//			    }
+//			}
+//			chart "Total production" type: series  size: {0.5,0.5} position: {0.5, 0} {
+//			    loop c over: production_outputs_T{
+//			    	data c value: tick_production_T[c];
+//			    }
+//			}
 	    }
-    }
+	}
 }

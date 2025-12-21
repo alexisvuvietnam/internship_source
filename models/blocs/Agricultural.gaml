@@ -186,13 +186,10 @@ species agricultural parent:bloc{
 					float quantity_needed <- production_output_inputs_A[c][u] * demand[c]; // quantify the resources consumed/emitted by this demand
 					tick_resources_used[u] <- tick_resources_used[u] + quantity_needed;
 					if(external_producers.keys contains u){ // if there is a known external producer for this product/good
-						//write "exist u = " + u;
 						bool av <- external_producers[u].producer.produce([u::quantity_needed]); // ask the external producer to product the required quantity
 						if not av{
 							ok <- false;
 						}
-					}else{
-						write "not exist u = " + u;
 					}
 				}
 				loop e over: production_emissions_A{ // apply emissions
