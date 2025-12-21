@@ -572,7 +572,7 @@ species transport_link {
  * Note : experiment car inherit another experiment, but we can't combine displays from multiple experiments at the same time. 
  * If needed, a new experiment combining all those displays should be added, for example in the Main code of the simulation.
  */
-experiment run_transport type: gui {
+experiment run_transport_gui type: gui {
 	output {
 		display Transport_information {
 			chart "Population direct consumption" type: series size: {0.5, 0.5} position: {0, 0} {
