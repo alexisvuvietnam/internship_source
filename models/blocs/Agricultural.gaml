@@ -90,6 +90,10 @@ species agricultural parent:bloc{
 		return production_outputs_A;
 	}
 	
+	list<string> get_output_resources_labels{
+		return production_outputs_A;
+	}	
+	
 	list<string> get_input_resources_labels{
 		return production_inputs_A;
 	}
@@ -191,6 +195,9 @@ species agricultural parent:bloc{
 							ok <- false;
 						}
 					}
+					//else{
+					//	write "not exist u = " + u;
+					//}
 				}
 				loop e over: production_emissions_A{ // apply emissions
 					float quantity_emitted <- production_output_emissions_A[c][e] * demand[c];
