@@ -1,12 +1,12 @@
 /**
-* Name: Ecosystem
+* Name: Environnement
 * Bloc représentant l'écosystème qui fournit le bois, le gibier et l'eau aux autres blocs. 
 * Écosystème on aurait dû l'appeler environnement en fait...
-*
+* Gestion des villes et mini-villes également.
 * Author: natmax93
 * Tags: 
 */
-model Ecosystem
+model Environnement
 
 import "../API/API.gaml"
 
@@ -54,16 +54,26 @@ global {
 /********************************************
  * BLOC PRINCIPAL ECOSYSTEM
  ********************************************/
-species ecosystem parent: bloc {
+species environnement parent: bloc {
 	string name <- "ecosystem";
 	/* Un agent pour la production des ressources */
 	eco_producer producer <- nil;
+	int population <- 67920000; // Population française
+	int nb_mini_cities <- population / 10000; // Nombre de mini-villes
+	int city_population <- 0; // Nombre d'habitants par constellation
 
 	/******** INITIALISATION DU BLOC ********/
 	action setup {
 		list<eco_producer> producers <- [];
 		create eco_producer number: 1 returns: producers;
 		producer <- first(producers);
+
+		// Création des mini-villes
+		create mini_city number: nb_mini_cities {
+		// Nombre d'habitants par mini-villes
+			pop <- myself.population / myself.nb_mini_cities;
+		}
+
 	}
 
 	/*
@@ -203,19 +213,15 @@ species ecosystem parent: bloc {
 
 	}
 
-	/**
-	 * L'environnement affiche les émissions de CO2
-	  */
-//	species eco_consumer parent:consumption_agent {
-	//		
-	//		// TODO
-	//		action consume(human h) {
-	//			
-	//		}
-	//		
-	//		action
-	//	}
+}
 
+/********************************************
+ * VILLES ET MINI-VILLES
+ ********************************************/
+species mini_city {
+	float radius <- 1000.0; // Rayon d'un mini-ville en mètre
+	float surface <- radius * radius * 3.14; // Calcul de la surface
+	int pop <- 0 min: 40 max: 50000; // de 40 à 50000 habitants
 }
 
 /********************************************
@@ -225,34 +231,34 @@ experiment run_ecosystem type: gui {
 	output {
 		display Ecosystem_stock_information type: 2d {
 			chart "Évolution du stock de bois (en milliards)" type: series size: {0.5, 0.5} position: {0, 0} {
-				data "Stock de bois" value: stock_wood;
+				data "Stock de bois" value: stock_wood color: #brown;
 			}
 
 			chart "Évolution du stock du nombre de gibiers (en millions)" type: series size: {0.5, 0.5} position: {0, 0.5} {
-				data "Stock de gibier (sangliers)" value: stock_meat / 150.0;
+				data "Stock de gibier (sangliers)" value: stock_meat / 150.0 color: #darkred;
 			}
 
 			chart "Évolution de la surface dispo (en m2)" type: series size: {0.5, 0.5} position: {0.5, 0} {
-				data "Surface libre" value: available_surface;
+				data "Surface libre" value: available_surface color: #aqua;
 			}
 
 		}
 
 		display Ecosystem_demand_information type: 2d {
 			chart "Quantité d'utilisation du bois à chaque tick" type: series size: {0.5, 0.5} position: {0, 0} {
-				data "Bois" value: tick_production_ECO["m3_wood"];
+				data "Bois" value: tick_production_ECO["m3_wood"] color: #brown;
 			}
 
 			chart "Quantité d'utilisation de viande à chaque tick" type: series size: {0.5, 0.5} position: {0, 0.5} {
-				data "Viande" value: tick_production_ECO["kg_meat"];
+				data "Viande" value: tick_production_ECO["kg_meat"] color: #darkred;
 			}
 
 			chart "Quantité d'utilisation d'eau à chaque tick" type: series size: {0.5, 0.5} position: {0.5, 0} {
-				data "Eau" value: tick_production_ECO["L water"];
+				data "Eau" value: tick_production_ECO["L water"] color: #aqua;
 			}
 
 			chart "Quantité de GES absorbée à chaque tick" type: series size: {0.5, 0.5} position: {0.5, 0.5} {
-				data "GES" value: tick_absorbed_ECO["gCO2e emissions"];
+				data "GES" value: tick_absorbed_ECO["gCO2e emissions"] color: #black;
 			}
 
 		}
