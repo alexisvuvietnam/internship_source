@@ -49,7 +49,6 @@ global {
 		"kg_vegetables"::[0.5, 0.5, 0.8, 0.8, 1.2, 1.3, 1.4, 1.3, 1.2, 1.0, 0.7, 0.6]    
 	];
 	
-
 	/* Climate variability parameters */
 	float climate_min <- 0.7;
 	float climate_max <- 1.3;
