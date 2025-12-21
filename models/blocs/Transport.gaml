@@ -147,8 +147,7 @@ species transport parent:bloc{
 	action population_activity(list<human> pop) {
 	    // calculate trip numbers based on population
 	    // TODO : modify to get the population from demography
-	    int agreg_pop <- 66352;
-	    int nb_population <- length(pop) * agreg_pop; 
+	    int nb_population <- 66352000; // population statique
 	    
 	    float nb_weeks_per_month <- 4.34524;
 	    
@@ -322,7 +321,7 @@ species transport parent:bloc{
 	species long_trip{
 		map<string, float> long_trip_decisions_france_data <- ["trip_tgv"::0.01845,"trip_ter"::0.13205,"trip_taxi"::0.8495];
 		map<string, float> long_trip_decisions_ecotopia <- ["trip_tgv"::0.60,"trip_ter"::0.40,"trip_taxi"::0.10];
-		float avg_long_trip_distance <- 500.0#km; // km - average distance for long trips
+		float avg_long_trip_distance <- 662.0#km; // average distance for long trips
 		taxis my_taxis <- nil;
 		ters my_ters <- nil;
 		tgvs my_tgvs <- nil;
@@ -391,7 +390,7 @@ species transport parent:bloc{
 	
 	species short_trip{
 		map<string, float> short_trip_decisions <- ["trip_minibus"::0.243,"trip_bike"::0.074,"trip_walking"::0.683];
-		float avg_short_trip_distance <- 5.0#km; // km - average distance for short trips
+		float avg_short_trip_distance <- 4.0#km; // average distance for short trips
 		minibuses my_minibuses <- nil;
 		bikes my_bikes <- nil;
 		legs my_legs <- nil;
