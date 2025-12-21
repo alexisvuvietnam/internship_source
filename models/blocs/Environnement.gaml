@@ -30,11 +30,11 @@ global {
 	float used_surface <- 0.0; // Surface utilisée par les autres secteurs
 
 	/* Production annuelle convertie en production mensuelle*/
-	float prod_wood <- 0.0878 / 12;
-	float prod_meat <- 0.9 * 150.0 / 12; // Un sanglier européen pèse environ 150 kg
+	float prod_wood <- 87800000 / 12;
+	float prod_meat <- 900000 * 150.0 / 12; // Un sanglier européen pèse environ 150 kg
 
 	/* GES absorbé par mois (en moyenne période 2007 à 2020 */
-	float GES_absorbe_per_tick <- 83.0; // en milliers
+	float GES_absorbe_per_tick <- 8.3e10; // 83 000 tonnes par mois (ici en grammes)
 
 	/* Compteurs pour les données */
 	map<string, float> tick_production_ECO <- [];
@@ -147,10 +147,10 @@ species environnement parent: bloc {
 
 				/* Production de bois */
 				if (r = "m3_wood") {
-					// write "Demande de " + qty + " de " + r;
-					// write "stock_wood: " + stock_wood;
+				// write "Demande de " + qty + " de " + r;
+				// write "stock_wood: " + stock_wood;
 					if (stock_wood >= qty) {
-						// write "Demande de " + qty + " de m3 de bois";
+					// write "Demande de " + qty + " de m3 de bois";
 						stock_wood <- stock_wood - qty;
 						tick_production[r] <- tick_production[r] + qty;
 					} else {
@@ -191,8 +191,8 @@ species environnement parent: bloc {
 
 			/* Émission de GES (absorbtion dans le cas de l'écosystème */
 			// Ajout d'une petite variation epsilon arbitraire
-			float eps <- 1.0;
-			tick_emissions["gCO2e emissions"] <- rnd(GES_absorbe_per_tick - eps, GES_absorbe_per_tick + eps);
+			//float eps <- 1.0;
+			tick_emissions["gCO2e emissions"] <- -GES_absorbe_per_tick;
 			return true; // production réussie
 		}
 
@@ -232,11 +232,11 @@ species mini_city {
 experiment run_ecosystem type: gui {
 	output {
 		display Ecosystem_stock_information type: 2d {
-			chart "Évolution du stock de bois (en milliards)" type: series size: {0.5, 0.5} position: {0, 0} {
+			chart "Évolution du stock de bois (en m3)" type: series size: {0.5, 0.5} position: {0, 0} {
 				data "Stock de bois" value: stock_wood color: #brown;
 			}
 
-			chart "Évolution du stock du nombre de gibiers (en millions)" type: series size: {0.5, 0.5} position: {0, 0.5} {
+			chart "Évolution du stock du nombre de gibiers" type: series size: {0.5, 0.5} position: {0, 0.5} {
 				data "Stock de gibier (sangliers)" value: stock_meat / 150.0 color: #darkred;
 			}
 

@@ -35,6 +35,32 @@ global {
 	geometry shape <- envelope(shape_file_bounds);
 	geometry shape_cities <- envelope(shape_file_cities);
 
+	// Données pour chaque secteur
+
+	// Surface
+	float surface_used_agri <- 0.0;
+	float surface_used_env <- 0.0;
+	//	float surface_used_city <- 0.0;
+	float surface_used_energy <- 0.0;
+
+	// Eau
+	float water_used_agri <- 0.0;
+	float water_used_energy <- 0.0;
+	//	float water_used_city <- 0.0;
+
+	// Énergie
+	float energy_used_agri <- 0.0;
+	float energy_used_urban <- 0.0;
+	float energy_used_transport <- 0.0;
+	//	float energy_used_city <- 0.0;
+
+	// GES émis
+	float GES_emissions_agri <- 0.0;
+	float GES_emissions_env <- 0.0;
+	//	float GES_emissions_city <- 0.0;
+	float GES_emissions_energy <- 0.0;
+	float GES_emissions_urban <- 0.0;
+
 	init {
 		if (use_gis) {
 		// setup the territory :
@@ -49,7 +75,10 @@ global {
 			enabled <- enable_demography;
 		}
 
-		create agricultural number: 1;
+		create agricultural number: 1 {
+			pop_size <- population_size;
+		}
+
 		create energy number: 1;
 		create urbanplanning number: 1;
 		create transport number: 1;
@@ -91,8 +120,84 @@ experiment display_gis type: gui {
 }
 
 experiment main_experiment type: gui {
+//	float	total_emission <- world.tick_emissions_A["gCO2e emissions"] + world.tick_emissions_U["gCO2e emissions"] + world.tick_emissions_E["gCO2e emissions"] + world.tick_emissions_T["gCO2e emissions"] + world.tick_absorbed_ECO["gCO2e emissions"];
 	parameter "Taille de la population :" var: population_size category: 'Model';
-	parameter "Nombre de mini-villes :" var: number_of_mini_cities category: 'Model';
-	parameter "Nombre d'individus par constellation de mini-villes:" var: city_population category: 'Model';
+	//	parameter "Nombre de mini-villes :" var: number_of_mini_cities category: 'Model';
+	//	parameter "Nombre d'individus par constellation de mini-villes:" var: city_population category: 'Model';	
+	output {
+	// Monitor des différentes valeurs
+		monitor "Énergie consommée agriculture" value: world.tick_resources_used_A["kWh energy"];
+		monitor "Énergie consommée urbanisme" value: world.tick_resources_used_U["kWh energy"];
+		monitor "Énergie consommée transport" value: world.tick_resources_used_T["kWh energy"];
+		monitor "Eau consommée agriculture" value: world.tick_resources_used_A["L water"];
+		monitor "Eau consommée énergie" value: world.tick_resources_used_E["L water"];
+		monitor "GES émis agriculture" value: world.tick_emissions_A["gCO2e emissions"];
+		monitor "GES émis urbanisme" value: world.tick_emissions_U["gCO2e emissions"];
+		monitor "GES émis énergie" value: world.tick_emissions_E["gCO2e emissions"];
+		monitor "GES émis transport" value: world.tick_emissions_T["gCO2e emissions"];
+		monitor "GES absorbés par l'environnement" value: world.tick_absorbed_ECO["gCO2e emissions"];
+
+		// Affichage de la consommation d'énergie
+		display "Répartition de la consommation d'énergie pour chaque secteur" type: 2d {
+			chart "Consommation d'énergie pour chaque secteur" type: pie {
+				data "Agriculture" value: world.tick_resources_used_A["kWh energy"] color: #orange;
+				data "Urbanisme" value: world.tick_resources_used_U["kWh energy"] color: #gray;
+				data "Transport" value: world.tick_resources_used_T["kWh energy"] color: #blue;
+			}
+
+		}
+
+		display "Évolution de la consommation d'énergie pour chaque secteur" type: 2d {
+			chart "Évolution de la consommation d'énergie pour chaque secteur" type: series {
+				data "Agriculture" value: world.tick_resources_used_A["kWh energy"] color: #orange;
+				data "Urbanisme" value: world.tick_resources_used_U["kWh energy"] color: #gray;
+				data "Transport" value: world.tick_resources_used_T["kWh energy"] color: #blue;
+			}
+
+		}
+
+		// Affichage de la consommation d'eau
+		display "Répartition de la consommation d'eau pour chaque secteur" type: 2d {
+			chart "Consommation d'eau pour chaque secteur" type: pie {
+				data "Agriculture" value: world.tick_resources_used_A["L water"] color: #orange;
+				data "Énergie" value: world.tick_resources_used_E["L water"] color: #yellow;
+			}
+
+		}
+
+		display "Évolution de la consommation d'eau pour chaque secteur" type: 2d {
+			chart "Évolution de la consommation d'eau pour chaque secteur" type: series {
+				data "Agriculture" value: world.tick_resources_used_A["L water"] color: #orange;
+				data "Énergie" value: world.tick_resources_used_E["L water"] color: #yellow;
+			}
+
+		}
+
+		// Affichage des GES
+		display "Répartition de la production de GES pour chaque secteur" type: 2d {
+			chart "Quantité de GES émis pour chaque secteur (en grammes)" type: pie {
+				data "Agriculture" value: world.tick_emissions_A["gCO2e emissions"] color: #orange;
+				data "Urbanisme" value: world.tick_emissions_U["gCO2e emissions"] color: #gray;
+				data "Energie" value: world.tick_emissions_E["gCO2e emissions"] color: #yellow;
+			}
+
+		}
+
+		display "Évolution de l'émission de GES pour chaque secteur" type: 2d {
+			chart "Évolution de l'émission de GES pour chaque secteur (en grammes)" type: series {
+				data "Agriculture" value: world.tick_emissions_A["gCO2e emissions"] color: #orange;
+				data "Urbanisme" value: world.tick_emissions_U["gCO2e emissions"] color: #gray;
+				data "Energie" value: world.tick_emissions_E["gCO2e emissions"] color: #yellow;
+				data "Transport" value: world.tick_emissions_T["gCO2e emissions"] color: #blue;
+				data "Environnement" value: world.tick_absorbed_ECO["gCO2e emissions"] color: #green; // Ne s'affiche pas pour les données négatives
+				data "Total" value:
+				world.tick_emissions_A["gCO2e emissions"] + world.tick_emissions_U["gCO2e emissions"] + world.tick_emissions_E["gCO2e emissions"] + world.tick_emissions_T["gCO2e emissions"] + world.tick_absorbed_ECO["gCO2e emissions"]
+				color: #black;
+			}
+
+		}
+
+	}
+
 }
 
