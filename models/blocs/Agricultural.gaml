@@ -267,7 +267,6 @@ species agricultural parent: bloc {
 			loop e over: production_emissions_A {
 				tick_emissions[e] <- 0.0;
 			}
-
 			stock_veg <- 0.0;
 			stock_meat <- 0.0;
 			surface_veg <- 0.0;
@@ -316,20 +315,6 @@ species agricultural parent: bloc {
 					} else {
 					//write "not exist u = " + u;
 					}
-					// every year we ask surface_needed
-
-					/*if (tick_counter=0){
-						if (external_producers.keys contains u){
-							bool av <- external_producers["m² land"].producer.produce(["m² land"::surface_veg+surface_meat]);
-							if not av{
-								ok_surface <- false;
-							}else{
-								float surface_veg <- surface_veg + indivudual_consumption_A["kg_vegetables"]*production_output_inputs_A["kg_vegetables"]["m² land"];
-								float surface_meat <- surface_meat + indivudual_consumption_A["kg_meat"]*production_output_inputs_A["kg_meat"]["m² land"];
-							}
-						
-						}
-					}*/
 				}
 
 				loop e over: production_emissions_A { // apply emissions
