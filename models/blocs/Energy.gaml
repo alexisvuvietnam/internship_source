@@ -392,7 +392,7 @@ species energy parent:bloc{
 			loop energy_type over: demand.keys{
 				ask energy{
 					tick_external_demand_E <- tick_external_demand_E + demand[energy_type];
-					write "neeeeddddsssss"+"  "+ demand+ demand.keys +"combien"+ demand[energy_type]+"/////"+stock_E[energy_type];
+					//write "neeeeddddsssss"+"  "+ demand+ demand.keys +"combien"+ demand[energy_type]+"/////"+stock_E[energy_type];
 					if(demand[energy_type] > stock_E[energy_type]){
 						ok <- false;
 					}
@@ -402,12 +402,12 @@ species energy parent:bloc{
 			if(ok){
 				loop energy_type over: demand.keys {
 					ask energy {
-						write "Energy - Demand External" +demand[energy_type];
+						//write "Energy - Demand External" +demand[energy_type];
 						//write "stock" +stock_E[energy_type];
 						//write "nee222222" + demand+ demand.keys +"combien"+ demand[energy_type]+"/////"+stock_E[energy_type];
 						stock_E[energy_type] <- stock_E[energy_type] - demand[energy_type];
 						tick_consommee <- tick_consommee + demand[energy_type];
-						write "Energy - Stock" +stock_E[energy_type];
+						//write "Energy - Stock" +stock_E[energy_type];
 					}
 				}
 			}
@@ -479,9 +479,9 @@ species energy parent:bloc{
 		   		do set_tick_emissions(poll);
 		   		
 		 		
-		 		write "E - Production succeed."+ tick_production["kWh energy"];
+		 		//write "E - Production succeed."+ tick_production["kWh energy"];
 		 	}else{
-		 		write "E - Production failed.";
+		 		//write "E - Production failed.";
 		 	}
 		}
 		
