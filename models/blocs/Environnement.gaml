@@ -59,7 +59,6 @@ species environnement parent: bloc {
 	/* Un agent pour la production des ressources */
 	eco_producer producer <- nil;
 	int population <- 67920000; // Population française
-	int nb_mini_cities <- population / 10000; // Nombre de mini-villes
 	int city_population <- 0; // Nombre d'habitants par constellation
 
 	/******** INITIALISATION DU BLOC ********/
@@ -67,13 +66,6 @@ species environnement parent: bloc {
 		list<eco_producer> producers <- [];
 		create eco_producer number: 1 returns: producers;
 		producer <- first(producers);
-
-		// Création des mini-villes
-		create mini_city number: nb_mini_cities {
-		// Nombre d'habitants par mini-villes
-			pop <- myself.population / myself.nb_mini_cities;
-		}
-
 	}
 
 	/*
@@ -215,15 +207,6 @@ species environnement parent: bloc {
 
 	}
 
-}
-
-/********************************************
- * VILLES ET MINI-VILLES
- ********************************************/
-species mini_city {
-	float radius <- 1000.0; // Rayon d'un mini-ville en mètre
-	float surface <- radius * radius * 3.14; // Calcul de la surface
-	int pop <- 0 min: 40 max: 50000; // de 40 à 50000 habitants
 }
 
 /********************************************

@@ -22,7 +22,7 @@ global {
 	int population_size <- 1000000; // number of people in the simulation
 	int number_of_mini_cities <- 100; // number of mini-cities
 	int city_population <- 70000; // number of people per city (constellations of mini-cities)
-	bool use_gis <- false; // use GIS or not (needed to spatialise, instanciate territory species, and to display the map)
+	bool use_gis <- true; // use GIS or not (needed to spatialise, instanciate territory species, and to display the map)
 	float step <- 1 #month; // the simulation step is a month
 	bool enable_demography <- true; // true to activate the demography (births, deaths), else false
 
@@ -60,6 +60,8 @@ global {
 	//	float GES_emissions_city <- 0.0;
 	float GES_emissions_energy <- 0.0;
 	float GES_emissions_urban <- 0.0;
+	
+	cities city_generator;
 
 	init {
 		if (use_gis) {
@@ -68,6 +70,16 @@ global {
 			create mountain from: shape_mountains;
 			create forest from: shape_file_forests;
 			create water_source from: shape_rivers_lakes;
+			// generation of the cities
+			create cities number: 1 with:[
+				shape_file_cities::shape_file_cities,
+				city_population::city_population,
+				number_of_mini_cities::number_of_mini_cities,
+				population_size::population_size
+			];
+			ask cities {
+				do generate_cities();
+			}
 		}
 
 		// instanciate the blocs (E, A and R blocs here):
@@ -86,7 +98,6 @@ global {
 		// L'environnement gère les mini-villes
 		create environnement number: 1 {
 			population <- population_size;
-			nb_mini_cities <- number_of_mini_cities;
 		}
 
 		create coordinator number: 1;
@@ -94,9 +105,7 @@ global {
 			do register_all_blocs;
 			do start;
 		}
-
 	}
-
 }
 
 /**
@@ -113,10 +122,10 @@ experiment display_gis type: gui {
 			species mountain aspect: base transparency: 0.15;
 			species forest aspect: base transparency: 0.15;
 			species water_source aspect: base;
+			species mini_city aspect: base;
+			species main_city aspect: base;
 		}
-
 	}
-
 }
 
 experiment main_experiment type: gui {
@@ -144,7 +153,6 @@ experiment main_experiment type: gui {
 				data "Urbanisme" value: world.tick_resources_used_U["kWh energy"] color: #gray;
 				data "Transport" value: world.tick_resources_used_T["kWh energy"] color: #blue;
 			}
-
 		}
 
 		display "Évolution de la consommation d'énergie pour chaque secteur" type: 2d {
@@ -153,7 +161,6 @@ experiment main_experiment type: gui {
 				data "Urbanisme" value: world.tick_resources_used_U["kWh energy"] color: #gray;
 				data "Transport" value: world.tick_resources_used_T["kWh energy"] color: #blue;
 			}
-
 		}
 
 		// Affichage de la consommation d'eau
@@ -162,7 +169,6 @@ experiment main_experiment type: gui {
 				data "Agriculture" value: world.tick_resources_used_A["L water"] color: #orange;
 				data "Énergie" value: world.tick_resources_used_E["L water"] color: #yellow;
 			}
-
 		}
 
 		display "Évolution de la consommation d'eau pour chaque secteur" type: 2d {
@@ -170,7 +176,6 @@ experiment main_experiment type: gui {
 				data "Agriculture" value: world.tick_resources_used_A["L water"] color: #orange;
 				data "Énergie" value: world.tick_resources_used_E["L water"] color: #yellow;
 			}
-
 		}
 
 		// Affichage des GES
@@ -180,7 +185,6 @@ experiment main_experiment type: gui {
 				data "Urbanisme" value: world.tick_emissions_U["gCO2e emissions"] color: #gray;
 				data "Energie" value: world.tick_emissions_E["gCO2e emissions"] color: #yellow;
 			}
-
 		}
 
 		display "Évolution de l'émission de GES pour chaque secteur" type: 2d {
@@ -194,10 +198,7 @@ experiment main_experiment type: gui {
 				world.tick_emissions_A["gCO2e emissions"] + world.tick_emissions_U["gCO2e emissions"] + world.tick_emissions_E["gCO2e emissions"] + world.tick_emissions_T["gCO2e emissions"] + world.tick_absorbed_ECO["gCO2e emissions"]
 				color: #black;
 			}
-
 		}
-
 	}
-
 }
 
