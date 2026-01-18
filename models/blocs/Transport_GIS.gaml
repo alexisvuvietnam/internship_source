@@ -9,8 +9,8 @@ model Transport_GIS
 import "../API/API.gaml"
 
 global {
-/* Data used to instatiate */
-// TODO : ARBITRARY VALUES TO REPLACE
+	/* Data used to instatiate */
+	// TODO : ARBITRARY VALUES TO REPLACE
 	float max_capacity_highway <- 200.0;
 	float max_capacity_main_road <- 100.0;
 	float max_capacity_local_road <- 50.0;
@@ -47,126 +47,9 @@ global {
 			// If you see this error when trying to run an experiment, this means the coordinator agent does not exist.
 			// Ensure you launched the experiment from the Main model (and not from the bloc model containing the experiment).
 		}
-
 	}
-
 }
 
-/*
- * Species of a main_city representing a main city of France (one of the cities given in the file 'cities_france.shp'
- * It serves as a point of referencefor the placement of a constellations of mini-cities around it 
- */
-species main_city {
-	string city_name;
-	int city_population;
-	list<mini_city> mini_cities_list;
-
-	action generate_mini_cities (int nb_mini_cities_per_city, float mini_city_distance_from_center) {
-		loop i from: 0 to: nb_mini_cities_per_city - 1 {
-		// Angle evenly spaced around the center 
-		// TODO : changer le placement des villes pour un placement aléatoire dans un rayon
-			float angle <- i * (360.0 / nb_mini_cities_per_city);
-
-			// Position with small random noise
-			float distance <- mini_city_distance_from_center * (0.8 + rnd(0.4));
-			float angle_noise <- angle + rnd(-15.0, 15.0);
-			point offset <- {distance * cos(angle_noise), distance * sin(angle_noise)};
-			point mini_city_location <- location + offset;
-			create mini_city {
-				name <- myself.city_name + "_MC" + i;
-				location <- mini_city_location;
-				parent_city <- myself; //reference to its parent
-				zone_radius <- 1 #km; // radius of mini-cities
-				add self to: myself.mini_cities_list;
-			}
-
-		}
-
-	}
-	// --- GIS
-	aspect default {
-		draw circle(1000) color: #darkgray border: #black;
-		draw city_name color: #black size: 16 font: font("Arial", 16, #bold) at: location + {0, -1200};
-	}
-
-}
-
-/* 
- * Species of mini-city created from a main city of France (metropolitan)
- * it possesses a reference to its parent city, which is taken as a point of reference to place major
- * transport axes later on
- */
-species mini_city {
-	string name;
-	main_city parent_city;
-	float zone_radius;
-	int population;
-	list<mini_city> connected_mini_cities;
-
-	// --- GIS
-	int degree update: length(connected_mini_cities);
-
-	aspect default {
-	// color variation depending on connectivity
-		rgb node_color <- rgb(255 - min([255, degree * 30]), 100 + min([155, degree * 20]), 100);
-		draw circle(zone_radius) color: node_color border: #black;
-		draw name color: #black size: 10 at: location + {0, zone_radius + 100};
-	}
-
-	aspect degree {
-		draw circle(zone_radius) color: #white border: #black;
-		draw string(degree) color: #black size: 14 font: font("Arial", 14, #bold);
-	}
-
-}
-
-/*
- * Species used for the generation of cities and mini-cities
- */
-species cities {
-	file shape_file_cities;
-	geometry shape;
-	// Parameters for city generation asked to user :
-	int population_size; // number of people in the simulation
-	int number_of_mini_cities; // number of mini-cities
-	int city_population; // number of people per constellations of mini-cities
-	int number_of_cities;
-	int nb_mini_cities_per_city;
-	int mini_city_population <- 10000; // population of a mini-city (10000 by default according to CDC)
-	list<mini_city> mini_cities; // list of all mini-cities
-	list<main_city> main_cities; // list of all main-cities
-	float mini_city_distance_from_center <- 2.0 #km;
-
-	init {
-	// 1. create cities (mini-city constellations)
-		create main_city from: shape_file_cities with: [city_name::read("name"), city_population::city_population];
-		main_cities <- list(main_city);
-		number_of_cities <- length(main_city);
-		nb_mini_cities_per_city <- int(city_population / mini_city_population);
-
-		// 2. create mini-cities around each constellations
-		ask main_city {
-			do generate_mini_cities(myself.nb_mini_cities_per_city, myself.mini_city_distance_from_center);
-		}
-
-		mini_cities <- list(mini_city);
-		write mini_cities;
-	}
-
-	list<mini_city> get_mini_cities {
-		return mini_cities;
-	}
-
-	list<main_city> get_main_cities {
-		return main_cities;
-	}
-
-}
-
-/**
- * We define here the agricultural bloc as a species.
- * We implement the methods of the API.
- */
 species transport_gis parent: bloc {
 	string name <- "transport";
 	transport_producer_gis producer <- nil;
@@ -507,9 +390,7 @@ species transport_gis parent: bloc {
 		if link_exists(a, b) {
 			return first(transport_link where ((each.node_a = a and each.node_b = b) or (each.node_a = b and each.node_b = a)));
 		}
-
 	}
-
 }
 
 /*
@@ -559,10 +440,8 @@ species transport_link {
 			}
 
 		}
-
 		draw shape color: link_color width: 3.0;
 	}
-
 }
 
 /**
@@ -579,7 +458,6 @@ experiment run_transport_gui type: gui {
 				loop c over: production_outputs_T {
 					data c value: tick_pop_consumption_T[c]; // note : products consumed by other blocs NOT included here (only population direct consumption)
 				}
-
 			}
 
 			chart "Total production" type: series size: {0.5, 0.5} position: {0.5, 0} {
