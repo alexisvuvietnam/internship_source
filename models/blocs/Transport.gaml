@@ -69,6 +69,14 @@ global {
 	    "bike"::16600000
 	];
 	
+	map<string, float> km_per_tick <- [
+		"taxis"::0.0,
+		"tgv"::0.0,
+		"ter"::0.0,
+		"minibus"::0.0,
+		"bike"::0.0
+	];
+	
     // max trip per month
     map<string, int> vehicle_max_trips <- ["taxi"::330, "tgv"::120, "ter"::240, "minibus"::390, "bike"::225];
     
@@ -100,6 +108,8 @@ species transport parent:bloc{
     // boolean values to handle shortage
     bool do_long_trips <- true;
     bool do_short_trips <- true;
+    
+    list<transport_mode> transport_modes_available;
 	
 	action setup{
 		list<transport_producer> producers <- [];
@@ -234,6 +244,15 @@ species transport parent:bloc{
 	        
 	    }
 	    // write transport_usage;
+	}
+	
+	action update_transport_available {
+		loop mode over: transport_modes {
+			ask mode {
+				// do update_available(km_per_tick[mode]);
+				
+			}		
+		}
 	}
 
 	species transport_producer parent:production_agent{
@@ -410,8 +429,8 @@ species transport parent:bloc{
 				int passengers_per_trip <- ref_vehicle.max_passenger_capacity;
 				float nb_trips_tgv <- nb_trips/passengers_per_trip;
 				
-				float total_km <- nb_trips_tgv * myself.avg_long_trip_distance;
-				float energy_consumed <- total_km * ref_vehicle.consumption_per_km;
+				km_per_tick["tgv"] <- nb_trips_tgv * myself.avg_long_trip_distance;
+				float energy_consumed <- km_per_tick["tgv"] * ref_vehicle.consumption_per_km;
 				myself.tick_energy_consumption["trip_tgv"] <- myself.tick_energy_consumption["trip_tgv"] + energy_consumed;
 			}
 			ask my_ters {
@@ -419,8 +438,8 @@ species transport parent:bloc{
 				int passengers_per_trip <- ref_vehicle.max_passenger_capacity;
 				float nb_trips_ter <- nb_trips/passengers_per_trip;
 				
-				float total_km <- nb_trips_ter * myself.avg_long_trip_distance;
-				float energy_consumed <- total_km * ref_vehicle.consumption_per_km;
+				km_per_tick["ter"] <- nb_trips_ter * myself.avg_long_trip_distance;
+				float energy_consumed <- km_per_tick["ter"] * ref_vehicle.consumption_per_km;
 				myself.tick_energy_consumption["trip_ter"] <- myself.tick_energy_consumption["trip_ter"] + energy_consumed;
 			}
 			ask my_taxis {
@@ -428,8 +447,8 @@ species transport parent:bloc{
 				int passengers_per_trip <- ref_vehicle.max_passenger_capacity;
 				float nb_trips_taxi <- nb_trips/passengers_per_trip;
 				
-				float total_km <- nb_trips_taxi * myself.avg_long_trip_distance;
-				float energy_consumed <- total_km * ref_vehicle.consumption_per_km;
+				km_per_tick["taxis"] <- nb_trips_taxi * myself.avg_long_trip_distance;
+				float energy_consumed <- km_per_tick["taxis"] * ref_vehicle.consumption_per_km;
 				myself.tick_energy_consumption["trip_taxi"] <- myself.tick_energy_consumption["trip_taxi"] + energy_consumed;
 			}
 		}
@@ -479,9 +498,16 @@ species transport parent:bloc{
 					int passengers_per_trip <- ref_vehicle.max_passenger_capacity;
 					float nb_trips_minibus <- nb_trips/passengers_per_trip;
 					
-					float total_km <- nb_trips_minibus * myself.avg_short_trip_distance;
-					float energy_consumed <- (total_km / passengers_per_trip) * ref_vehicle.consumption_per_km;
+					km_per_tick["minibus"] <- nb_trips_minibus * myself.avg_short_trip_distance;
+					float energy_consumed <- (km_per_tick["minibus"] / passengers_per_trip) * ref_vehicle.consumption_per_km;
 					myself.tick_energy_consumption["trip_minibus"] <- myself.tick_energy_consumption["trip_minibus"] + energy_consumed;
+				}
+				ask my_bikes {
+					float nb_trips <- myself.tick_trips_by_mode["trip_bike"];
+					int passengers_per_trip <- ref_vehicle.max_passenger_capacity;
+					float nb_trips_bike <- nb_trips/passengers_per_trip;
+					
+					km_per_tick["bike"] <- nb_trips_bike * myself.avg_short_trip_distance;
 				}
 			}
 			else {
@@ -541,6 +567,7 @@ species tgv_vehicle parent:vehicle {
 		consumption_per_km <- 13.0;
 		avg_speed <- 300.0;
 		max_passenger_capacity <- 550;
+		
 	}
 }
 species ter_vehicle parent:vehicle {
@@ -549,6 +576,7 @@ species ter_vehicle parent:vehicle {
 		consumption_per_km <- 14.2;
 		avg_speed <- 100.0;
 		max_passenger_capacity <- 250;
+		
 	}
 }
 species minibus_vehicle parent:vehicle {
@@ -557,6 +585,7 @@ species minibus_vehicle parent:vehicle {
 		consumption_per_km <- 2.0;
 		avg_speed <- 25.0;
 		max_passenger_capacity <- 90;
+		
 	}
 }
 species bike_vehicle parent:vehicle {
@@ -565,6 +594,7 @@ species bike_vehicle parent:vehicle {
 		consumption_per_km <- 0.0;
 		avg_speed <- 15.0;
 		max_passenger_capacity <- 1;
+		
 	}
 }
 species legs_vehicle parent:vehicle {
@@ -593,9 +623,16 @@ species transport_mode {
 	int number_available;
 	vehicle ref_vehicle;
 	int max_trips_per_tick; // nombre de trajets max par mois
+	float km_age; // initialisé à la mi-vie
+	int km_end_of_life; 
+	float alpha;
 
-	action update_number_available(int new_number){
-		number_available <- new_number;
+	action update_available(float km_travelled){
+		km_age <- km_age + km_travelled / number_available; // km_travelled est pour tous les véhicules
+		// TODO ajouter la maintenance
+		float ratio <- (km_age / km_end_of_life) ^ alpha;
+		number_available <- number_available - int(number_available * ratio);
+		
 	}
 }
 species taxis parent:transport_mode {
@@ -605,6 +642,9 @@ species taxis parent:transport_mode {
 		create taxi_vehicle number:1;
 		ref_vehicle <- first(taxi_vehicle);
 		max_trips_per_tick <- vehicle_max_trips["taxi"]; // 11 par jours
+		km_age <- 100000.0; // fin de vie vers 160-200K km
+		km_end_of_life <- 200000;
+		alpha <- 6.0;
 	}
 }
 species tgvs parent:transport_mode {
@@ -614,6 +654,9 @@ species tgvs parent:transport_mode {
 		create tgv_vehicle number:1;
 		ref_vehicle <- first(tgv_vehicle);
 		max_trips_per_tick <- vehicle_max_trips["tgv"]; // 4 par jours
+		km_age <- 7500000.0; // fin de vie vers 12-18M km
+		km_end_of_life <- 18000000;
+		alpha <- 6.0;
 	}
 }
 species ters parent:transport_mode {
@@ -623,6 +666,9 @@ species ters parent:transport_mode {
 		create ter_vehicle;
 		ref_vehicle <- first(ter_vehicle);
 		max_trips_per_tick <- vehicle_max_trips["ter"]; // 8 par jours (6-10)
+		km_age <- 5000000.0; // fin de vie vers 8-12M km
+		km_end_of_life <- 12000000;
+		alpha <- 6.0;
 	}
 }
 species minibuses parent:transport_mode {
@@ -632,6 +678,9 @@ species minibuses parent:transport_mode {
 		create minibus_vehicle;
 		ref_vehicle <- first(minibus_vehicle);
 		max_trips_per_tick <- vehicle_max_trips["minibus"]; // 13, (10-15) par
+		km_age <- 500000.0; // fin de vie vers 800K-1.2M km
+		km_end_of_life <- 1200000;
+		alpha <- 6.0;
 	}
 }
 species bikes parent:transport_mode {
@@ -641,6 +690,9 @@ species bikes parent:transport_mode {
 		create bike_vehicle number:1;
 		ref_vehicle <- first(bike_vehicle);
 		max_trips_per_tick <- vehicle_max_trips["bike"]; // 5-10 trajets par
+		km_age <- 25500.0; // fin de vie vers 40-70K km
+		km_end_of_life <- 70000;
+		alpha <- 6.0;
 	}
 }
 species legs parent:transport_mode {
@@ -650,6 +702,7 @@ species legs parent:transport_mode {
 		create legs_vehicle number:1;
 		ref_vehicle <- first(legs_vehicle);
 		max_trips_per_tick <- 3;
+		alpha <- 6.0;
 	}
 }
 species trucks parent:transport_mode {
@@ -660,6 +713,9 @@ species trucks parent:transport_mode {
 		create truck_vehicle number:1;
 		ref_vehicle <- first(truck_vehicle);
 		max_trips_per_tick <- vehicle_max_trips["truck"]; // 1.5 par jours
+		km_age <- 612500.0; // fin de vie vers 1-1.5M km
+		km_end_of_life <- 1500000;
+		alpha <- 6.0;
 	}
 }
 
