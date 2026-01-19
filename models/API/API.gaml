@@ -244,13 +244,12 @@ species cities {
 	int city_population; // number of people per constellations of mini-cities
 	int number_of_cities;
 	int nb_mini_cities_per_city;
-	int mini_city_population <- 10000; // population of a mini-city (10000 by default according to CDC)
+	int mini_city_population;
 	list<mini_city> mini_cities; // list of all mini-cities
 	list<main_city> main_cities; // list of all main-cities
 	float mini_city_distance_from_center <- 5.0 #km;
 
 	action generate_cities {
-		write(city_population);
 		// 1. create cities (mini-city constellations)
 		create main_city from: shape_file_cities with: [city_name::read("name"), city_population::city_population];
 		main_cities <- list(main_city);
@@ -262,14 +261,6 @@ species cities {
 			do generate_mini_cities(myself.nb_mini_cities_per_city, myself.mini_city_distance_from_center, myself.mini_city_population);
 		}
 		mini_cities <- list(mini_city);
-	}
-
-	list<mini_city> get_mini_cities {
-		return mini_cities;
-	}
-
-	list<main_city> get_main_cities {
-		return main_cities;
 	}
 }
 

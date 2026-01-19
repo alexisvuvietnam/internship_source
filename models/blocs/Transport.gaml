@@ -15,6 +15,14 @@ global {
 	list<string> production_emissions_T <- ["gCO2e emissions"];
 	list<string> production_trips <- ["trip_minibus", "trip_ter", "trip_tgv", "trip_taxi", "trip_truck"];
 	
+	// TODO : ARBITRARY VALUES TO REPLACE
+	float max_capacity_highway <- 200.0;
+	float max_capacity_main_road <- 100.0;
+	float max_capacity_local_road <- 50.0;
+	
+	// min length of a road to be determined a certain type (highway, main_road or local_road)
+	float min_length_highway <- 10.0 #km;
+	float min_length_main_road <- 5.0 #km;
 	
 	/* Production data */
 	map<string, map<string, float>> production_outputs_inputs_T <-
@@ -90,6 +98,22 @@ species transport parent:bloc{
 	transport_producer producer <- nil;
 	transport_consumer consumer <- nil;
 	
+	// demography informations
+	list<mini_city> mini_cities <- [];
+	list<main_city> main_cities <- [];
+	
+	int nb_mini_cities_per_city;
+	int mini_city_population;
+	int city_population;
+	
+	graph transport_network;
+	
+	bool use_gis;
+	
+	// parameters of Small-World (Watts-Strogatz) for the creation of the network
+	int k_neighbors;
+	float rewiring_probability <- 0.0; // TODO: at 0 for now because of an error in the deletion of transport link
+	
 	long_trip long <- nil;
 	short_trip short <- nil;
 	
@@ -109,6 +133,45 @@ species transport parent:bloc{
 		producer <- first(producers);
 		consumer <- first(consumers);
 		
+		/*
+		 * Generation of the transport network
+		 */
+		if (use_gis){
+			// verification that mini-cities is not empty
+			if empty(mini_cities) {
+				write "ERREUR: mini_cities est vide dans transport.setup()";
+				return;
+			}
+			int total_mini_cities <- length(mini_cities);
+			// verification that the number of mini-cities isnt lower than 3
+			if total_mini_cities < 3 {
+				write "ERREUR: Pas assez de mini-villes (" + total_mini_cities + "). Minimum: 3";
+				return;
+			}
+			nb_mini_cities_per_city <- int(city_population / mini_city_population);
+			// calculate the k_neighbors opt for watts-strogatz 
+			k_neighbors <- max([2, int(sqrt(total_mini_cities))]);
+			// force k even (recommended for watts-strogatz)
+			if mod(k_neighbors, 2) = 1 {
+				k_neighbors <- k_neighbors + 1;
+			}
+			// verification that k<n
+			k_neighbors <- min([k_neighbors, total_mini_cities - 1]);
+			// write "K voisins calculé: " + k_neighbors;
+			// generate small-world
+			write "Génération du réseau de transport...";
+			do create_network();
+			write "Création de " + length(transport_link) + " liens de transport";
+			// add inter city links
+			do add_inter_city_links();
+			// rebuild the graph
+			transport_network <- as_edge_graph(list(transport_link));
+		}
+		write "Réseau de transport généré avec succès";
+		write "Nombre d'autoroutes : " + length(list(transport_link where (each.link_type = "highway")));
+		write "Nombre de routes principales : " + length(list(transport_link where (each.link_type = "main_road")));
+		write "Nombre de routes locales : " + length(list(transport_link where (each.link_type = "local_road")));
+		
 		create long_trip number:1;
 		create short_trip number:1;
 		long <- first(long_trip);
@@ -119,6 +182,69 @@ species transport parent:bloc{
 		do collect_last_tick_data();
 		do population_activity(pop);
 		do update_transport_usage();
+	}
+	
+	action create_network {
+	// link the k closest cities
+		loop i from: 0 to: length(mini_cities) - 1 {
+			mini_city node_i <- mini_cities[i];
+			// order the other cities according to their proximity to mini city i (node_i)
+			list<mini_city> neighbors <- mini_cities where (each != node_i) sort_by (each.location distance_to node_i.location);
+			// connect to the k firts
+			loop j from: 0 to: min([k_neighbors - 1, length(neighbors) - 1]) {
+				mini_city node_j <- neighbors[j];
+				// verify if the link exists
+				if !link_exists(node_i, node_j) {
+					string type <- determine_link_type(node_i, node_j);
+					// verify there are no highway already between the two constellations
+					if type = "highway" {
+						if highway_exists(node_i, node_j) {
+							break;
+						}
+					}
+
+					create transport_link {
+						node_a <- node_i;
+						node_b <- node_j;
+						shape <- line([node_i.location, node_j.location]);
+						length <- shape.perimeter / 1000;
+						link_origin <- "regular";
+						link_type <- myself.determine_link_type(node_i, node_j);
+						max_capacity <- (link_type = "highway") ? max_capacity_highway : ((link_type = "main_road") ? max_capacity_main_road : max_capacity_local_road);
+					}
+				}
+			}
+		}
+		// rewiring (create long distance shortcuts)
+		list<transport_link> regular_links <- list(transport_link where (each.link_origin = "regular"));
+		loop link over: regular_links {
+		// rewire with a p_probability
+			if flip(rewiring_probability) {
+				mini_city node_a <- link.node_a;
+				mini_city node_b <- link.node_b;
+				// choose a new target node thats far away
+				list<mini_city> far_nodes <- mini_cities where (each != node_a and each != node_b and (each.location distance_to node_a.location) > min_length_main_road);
+				if !empty(far_nodes) {
+					mini_city new_target <- one_of(far_nodes);
+					if !link_exists(node_a, new_target) and new_target != nil and node_a != nil {
+					// delete the old link
+						ask link {
+							do die;
+						}
+						// create the new rewired link
+						create transport_link {
+							node_a <- node_a;
+							node_b <- new_target;
+							shape <- line([node_a.location, new_target.location]);
+							length <- shape.perimeter / 1000;
+							link_origin <- "rewired";
+							link_type <- myself.determine_link_type(node_a, new_target);
+							max_capacity <- (link_type = "highway") ? max_capacity_highway : ((link_type = "main_road") ? max_capacity_main_road : max_capacity_local_road);
+						}
+					}
+				}
+			}
+		}
 	}
 	
 	production_agent get_producer{
@@ -377,6 +503,83 @@ species transport parent:bloc{
 		}
 	}
 	
+	action add_inter_city_links {
+	// connect main cities between each other
+		loop i from: 0 to: length(main_cities) - 1 {
+			main_city city_i <- main_cities[i];
+			// find 2-3 closest cities
+			list<main_city> nearest_cities <- main_cities where (each != city_i) sort_by (each.location distance_to city_i.location);
+			loop j from: 0 to: min([2, length(nearest_cities) - 1]) {
+				main_city city_j <- nearest_cities[j];
+				// take a mini-city of each constellations
+				mini_city mini_i <- one_of(mini_city where (each.parent_city = city_i));
+				mini_city mini_j <- one_of(mini_city where (each.parent_city = city_j));
+				if mini_i != nil and mini_j != nil and !link_exists(mini_i, mini_j) {
+					create transport_link {
+						node_a <- mini_i;
+						node_b <- mini_j;
+						shape <- line([mini_i.location, mini_j.location]);
+						length <- shape.perimeter / 1000;
+						link_origin <- "inter_city";
+						link_type <- myself.determine_link_type(mini_i, mini_j);
+						max_capacity <- (link_type = "highway") ? max_capacity_highway : ((link_type = "main_road") ? max_capacity_main_road : max_capacity_local_road);
+					}
+
+				}
+
+			}
+		}
+	}
+	
+	bool highway_exists (mini_city a, mini_city b) {
+		main_city parent_a <- a.parent_city;
+		main_city parent_b <- b.parent_city;
+		bool exists <- false;
+		loop mA over: parent_a.mini_cities_list {
+			loop mB over: parent_b.mini_cities_list {
+				if (link_exists(mA, mB)) {
+					transport_link l <- get_link(mA, mB);
+					if (l.link_type = "highway") {
+						exists <- true;
+						break;
+					}
+
+				}
+
+			}
+
+		}
+		return exists;
+	}
+	
+	/*
+     * TODO: the type of the link is determined by an arbitrary length value
+     * research data to decide of the type if findable
+     */
+	action determine_link_type (mini_city a, mini_city b) type: string {
+		float distance <- a.location distance_to b.location;
+		if distance > min_length_highway {
+			return "highway";
+		} else if distance > min_length_main_road {
+			return "main_road";
+		} else {
+			return "local_road";
+		}
+
+	}
+	/*
+     * Test if a link between two mini-cities exists
+     */
+	bool link_exists (mini_city a, mini_city b) {
+		return !(empty(transport_link where ((each.node_a = a and each.node_b = b) or (each.node_a = b and each.node_b = a))));
+	}
+
+	action get_link (mini_city a, mini_city b) type: transport_link {
+		if link_exists(a, b) {
+			return first(transport_link where ((each.node_a = a and each.node_b = b) or (each.node_a = b and each.node_b = a)));
+		}
+	}
+	
 	species long_trip{
 		map<string, float> long_trip_decisions_france_data <- ["trip_tgv"::0.01845,"trip_ter"::0.13205,"trip_taxi"::0.8495];
 		map<string, float> long_trip_decisions_ecotopia <- ["trip_tgv"::0.60,"trip_ter"::0.40,"trip_taxi"::0.10];
@@ -512,6 +715,57 @@ species transport parent:bloc{
 		map<string, float> get_tick_energy {
 			return copy(tick_energy_consumption);
 		}
+	}
+}
+
+/*
+ * Species transport link representing the link between cities and mini-cities created in the graph
+ */
+species transport_link {
+	mini_city node_a;
+	mini_city node_b;
+	float length;
+	string link_type;
+	string link_origin <- "regular"; // "regular", "rewired", "inter_city"
+	float max_capacity;
+	float current_flow <- 0.0;
+
+	aspect base {
+		rgb link_color;
+		float link_width;
+		switch link_origin {
+			match "regular" {
+				link_color <- #lightgray;
+				link_width <- 1.5;
+			}
+
+			match "inter_city" {
+				link_color <- #red;
+				link_width <- 3.0;
+			}
+
+		}
+
+		draw shape color: link_color width: link_width;
+	}
+
+	aspect type {
+		rgb link_color;
+		switch link_type {
+			match "highway" {
+				link_color <- #red;
+			}
+
+			match "main_road" {
+				link_color <- #orange;
+			}
+
+			match "local_road" {
+				link_color <- #gray;
+			}
+
+		}
+		draw shape color: link_color width: 3.0;
 	}
 }
 

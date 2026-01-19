@@ -22,7 +22,10 @@ global {
 	int population_size <- 1000000; // number of people in the simulation
 	int number_of_mini_cities <- 100; // number of mini-cities
 	int city_population <- 70000; // number of people per city (constellations of mini-cities)
-	bool use_gis <- true; // use GIS or not (needed to spatialise, instanciate territory species, and to display the map)
+	int nb_mini_cities_per_city;
+	int mini_city_population <- 10000; // population of a mini-city (10000 by default according to CDC)
+	
+	bool use_gis <- false; // use GIS or not (needed to spatialise, instanciate territory species, and to display the map)
 	float step <- 1 #month; // the simulation step is a month
 	bool enable_demography <- true; // true to activate the demography (births, deaths), else false
 
@@ -62,6 +65,9 @@ global {
 	float GES_emissions_urban <- 0.0;
 	
 	cities city_generator;
+	
+	list<mini_city> mini_cities;
+	list<main_city> main_cities;
 
 	init {
 		if (use_gis) {
@@ -71,14 +77,21 @@ global {
 			create forest from: shape_file_forests;
 			create water_source from: shape_rivers_lakes;
 			// generation of the cities
+			nb_mini_cities_per_city <- int(city_population / mini_city_population);
 			create cities number: 1 with:[
 				shape_file_cities::shape_file_cities,
 				city_population::city_population,
 				number_of_mini_cities::number_of_mini_cities,
-				population_size::population_size
+				population_size::population_size,
+				mini_city_population::mini_city_population,
+				nb_mini_cities_per_city::nb_mini_cities_per_city
 			];
 			ask cities {
 				do generate_cities();
+			}
+			ask cities {
+				myself.mini_cities <- mini_cities;
+				myself.main_cities <- main_cities;
 			}
 		}
 
@@ -93,7 +106,14 @@ global {
 
 		create energy number: 1;
 		create urbanplanning number: 1;
-		create transport number: 1;
+		create transport number: 1 with: [
+			use_gis::use_gis,
+			mini_cities::mini_cities,
+			main_cities::main_cities,
+			city_population::city_population,
+			nb_mini_cities_per_city::nb_mini_cities_per_city,
+			mini_city_population::mini_city_population
+		];
 
 		// L'environnement gère les mini-villes
 		create environnement number: 1 {
@@ -124,6 +144,7 @@ experiment display_gis type: gui {
 			species water_source aspect: base;
 			species mini_city aspect: base;
 			species main_city aspect: base;
+			species transport_link aspect: base;
 		}
 	}
 }
