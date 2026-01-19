@@ -82,7 +82,7 @@ global {
 }
 
 /**
- * We define here the agricultural bloc as a species.
+ * We define here the transport bloc as a species.
  * We implement the methods of the API.
  */
 species transport parent:bloc{
