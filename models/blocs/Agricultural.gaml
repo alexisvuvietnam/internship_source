@@ -89,7 +89,7 @@ species agricultural parent: bloc {
 	action tick (list<human> pop) {
 		do collect_last_tick_data();
 		do population_activity(pop);
-		if (tick_counter = 12) {
+		if (tick_counter = 11) {
 			tick_counter <- 0;
 		} else {
 			tick_counter <- tick_counter + 1;
@@ -129,12 +129,22 @@ species agricultural parent: bloc {
 		if (cycle > 0) { // skip it the first tick
 			tick_pop_consumption_A <- consumer.get_tick_consumption(); // collect consumption behaviors
 			tick_resources_used_A <- producer.get_tick_inputs_used(); // collect resources used
-			tick_production_A <- producer.get_tick_outputs_produced(); // collect production
+			//tick_production_A <- producer.get_tick_outputs_produced(); // collect production
 			tick_emissions_A <- producer.get_tick_emissions(); // collect emissions
 			stock_meat_A <- producer.get_stock_meat(); // collect meat stock
 			stock_veg_A <- producer.get_stock_veg(); // collect vegetables stock
 			surface_veg_A <- producer.get_surface_veg();
 			surface_meat_A <- producer.get_surface_meat();
+			
+			// Produce from land using surface allocated in previous tick
+			// This must be called BEFORE reset_tick_counters to use the accumulated surface
+			ask agri_producer {
+				do produce_from_land();
+			}
+			
+			// Collect production AFTER produce_from_land updates it, BEFORE reset
+			tick_production_A <- producer.get_tick_outputs_produced();
+			
 			ask agri_consumer { // prepare new tick on consumer side
 				do reset_tick_counters;
 			}
@@ -152,7 +162,6 @@ species agricultural parent: bloc {
 			ask myself.agri_consumer {
 				do consume(myself); // individuals consume agricultural goods
 			}
-
 		}
 
 		ask agri_consumer { // produce the required quantities
@@ -241,16 +250,19 @@ species agricultural parent: bloc {
 				}
 
 				// Calculate actual yield with seasonal factors and climate variability
-				float actual_production <- calculate_yield(c, surface);
-
-				// Add production to stock
-				if (c = "kg_meat") {
-					stock_meat <- stock_meat + actual_production;
-				} else if (c = "kg_vegetables") {
-					stock_veg <- stock_veg + actual_production;
+				if (c = "kg_meat" or c = "kg_vegetables"){
+					float actual_production <- calculate_yield(c, surface);
+				
+				
+					// Add production to stock
+					if (c = "kg_meat") {
+						stock_meat <- stock_meat + actual_production;
+					} else if (c = "kg_vegetables") {
+						stock_veg <- stock_veg + actual_production;
+					}
+	
+					tick_production[c] <- tick_production[c] + actual_production;
 				}
-
-				tick_production[c] <- tick_production[c] + actual_production;
 			}
 
 		}
@@ -267,8 +279,6 @@ species agricultural parent: bloc {
 			loop e over: production_emissions_A {
 				tick_emissions[e] <- 0.0;
 			}
-			stock_veg <- 0.0;
-			stock_meat <- 0.0;
 			surface_veg <- 0.0;
 			surface_meat <- 0.0;
 		}
@@ -277,6 +287,7 @@ species agricultural parent: bloc {
 		float calculate_yield (string product_type, float surface_m2) {
 			float yield <- kg_per_m2[product_type];
 			int month <- tick_counter;
+			write "Agri : month : "+ month;
 			float season_factor <- season_multipliers[product_type][month];
 			float climate_factor <- rnd(climate_min, climate_max);
 			float total_yield <- surface_m2 * yield * season_factor * climate_factor;
@@ -322,7 +333,7 @@ species agricultural parent: bloc {
 					tick_emissions[e] <- tick_emissions[e] + quantity_emitted;
 				}
 
-				if ok {
+				/*if ok {
 					if (c = "kg_meat") {
 						stock_meat <- stock_meat + demand[c];
 					}
@@ -331,7 +342,7 @@ species agricultural parent: bloc {
 						stock_veg <- stock_veg + demand[c];
 					}
 
-				}
+				}*/
 
 				tick_production[c] <- tick_production[c] + demand[c];
 			}
