@@ -23,7 +23,7 @@ global{
 	int number_of_mini_cities <- 100; // number of mini-cities
 	int city_population <- 70000; // number of people per city (constellations of mini-cities)
 	
-	bool use_gis <- false; // use GIS or not (needed to spatialise, instanciate territory species, and to display the map)
+	bool use_gis <- true; // use GIS or not (needed to spatialise, instanciate territory species, and to display the map)
 	float step <- 1 #month; // the simulation step is a month
 	bool enable_demography <- true; // true to activate the demography (births, deaths), else false
 	
