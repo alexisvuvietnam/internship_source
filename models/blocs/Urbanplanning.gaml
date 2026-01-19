@@ -22,7 +22,7 @@ global {
 	// TODO : adapter les production et le cout de celle ci sur les bonnes
 	map<string, map<string, float>> production_output_inputs_U <- ["modular_house_lobby" :: ["m3_wood" :: 0.0, "kg_plastic" :: 129100.0], "modular_house_extension" :: ["m3_wood" :: 0.0, "kg_plastic" :: 38323.0], "wooden_building" :: ["m3_wood" :: 13, "kg_plastic" :: 0.0], "plastic_factory" :: ["m3_wood" :: 184000.0, "kg_plastic" :: 42000000.0], "kg_plastic" :: ["kg_coton" :: 16.5, "Wh energy" :: 6.0]];
 	map<string, map<string, float>> production_output_emissions_U <- ["modular_house_lobby" :: ["gCO2e emissions" :: 1000000.0], "modular_house_extension" :: ["gCO2e emissions" :: 30000.0], "wooden_building" :: ["gCO2e emissions" :: 300000.0], "plastic_factory" :: ["gCO2e emissions" :: 50000000.0], "kg_plastic" :: ["gCO2e emissions" :: 0.0]];
-	map<string, map<string, float>> supply_upkeep_U <- ["modular_house_lobby" :: ["m² land" :: 0.0], "modular_house_extension" :: ["m² land" :: 50.0], "wooden_building" :: ["m² land" :: 100.0], "plastic_factory" :: ["m² land" :: 1000000.0]];
+	map<string, map<string, float>> supply_upkeep_U <- ["modular_house_lobby" :: ["m² land" :: 0.0], "modular_house_extension" :: ["m² land" :: 50.0], "wooden_building" :: ["m² land" :: 100.0, "m3_wood" :: 0.03], "plastic_factory" :: ["m² land" :: 1000000.0]];
 	float factory_production_capacity <- 11000000.0;
 	
 	
