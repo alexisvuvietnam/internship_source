@@ -20,6 +20,17 @@ global {
 	int prop_human <- 7000;
 	int tick_counter <- 0; // track month 
 	float total_surface_used_A <- 0.0;
+	
+	/* Gibiers par mois moyenne : 13442208.3kg (9,8%) */
+	float kg_sanglier <- 900000 * 150.0 / 12; // Un sanglier européen pèse environ 150 kg
+	float kg_cerf <- 90000 * 150.0 / 12;
+	float kg_chevreuil <- 600000 * 20.0 /12;
+	float kg_chamois <- 12000 * 40.0 /12 ;
+	float kg_isard <- 3000 * 30.0 /12;
+	float kg_mouflon <- 3000 * 37.5 /12;
+	float kg_daim <- 2000 * 60.0 /12 ;
+	float kg_csika <- 80 * 50.0 /12;
+	float kg_gibier <- kg_sanglier + kg_cerf + kg_chevreuil + kg_chamois + kg_isard + kg_mouflon + kg_daim + kg_csika ;
 
 	/* Production data */
 	map<string, map<string, float>>
