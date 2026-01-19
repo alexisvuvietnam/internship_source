@@ -21,8 +21,11 @@ global {
 	list<string> production_emissions_ECO <- ["gCO2e emissions"]; // émissions absorbées (négatives)
 
 	/* Le stock des différentes ressources naturelles à l'initialisation (cad la France de 2022) */
-	float stock_wood <- 3100000000.0; // 3,1 millards de bois
+	float stock_wood <- 3100000000.0; // 3,1 millards de m3 de bois
 	float stock_meat <- 150.0 * 1000000.0; // 1 million de sangliers de 150kg
+	// Stock d'eau renouvelable : basé sur les précipitations annuelles (~440 milliards m3/an)
+	// Convertir en litres et prendre une part utilisable (environ 20% après évapotranspiration)
+	float stock_water <- 88e12; // 88 000 milliards de litres (stock annuel renouvelable utilisable)
 	float total_surface <- 5.44e11; // Surface de la France métropolitaine en m2
 	float forest_surface <- 1.71e11; // La forêt correspond à 171 000 km2 (m2)
 	/*  Surface dispo pour les autres secteurs  après avoir retiré la surface de la forêt de base */
@@ -30,10 +33,13 @@ global {
 	float used_surface <- 0.0; // Surface utilisée par les autres secteurs
 
 	/* Production annuelle convertie en production mensuelle*/
-	float prod_wood <- 87800000 / 12;
+	float prod_wood <- 87800000 / 12; //environ 7 millions de m3
 	float prod_meat <- 900000 * 150.0 / 12; // Un sanglier européen pèse environ 150 kg
+	// Production d'eau par mois (recharge via précipitations et infiltration)
+	// Environ 440 milliards m3/an de précipitations, 20% utilisable = 88 milliards m3/an
+	float prod_water <- (88e12) / 12; // environ 7 300 milliards de litres par mois
 
-	/* GES absorbé par mois (en moyenne période 2007 à 2020 */
+	/* GES absorbé par mois (en moyenne période 2007 à 2020) */
 	float GES_absorbe_per_tick <- 8.3e10; // 83 000 tonnes par mois (ici en grammes)
 
 	/* Compteurs pour les données */
@@ -86,6 +92,7 @@ species environnement parent: bloc {
 	/* Mise à jour des stocks */
 		stock_wood <- stock_wood + prod_wood;
 		stock_meat <- stock_meat + prod_meat;
+		stock_water <- stock_water + prod_water; // recharge mensuelle en eau
 	}
 
 	action collect_last_tick_data {
@@ -164,7 +171,12 @@ species environnement parent: bloc {
 
 				/* Production d’eau */
 				if (r = "L water") {
-					tick_production[r] <- tick_production[r] + qty;
+					if (stock_water >= qty) {
+						stock_water <- stock_water - qty;
+						tick_production[r] <- tick_production[r] + qty;
+					} else {
+						return false; // stock d'eau insuffisant
+					}
 				}
 
 				/* Attribution de la surface */
@@ -181,7 +193,7 @@ species environnement parent: bloc {
 
 			}
 
-			/* Émission de GES (absorbtion dans le cas de l'écosystème */
+			/* Émission de GES (absorbtion dans le cas de l'écosystème) */
 			// Ajout d'une petite variation epsilon arbitraire
 			//float eps <- 1.0;
 			tick_emissions["gCO2e emissions"] <- -GES_absorbe_per_tick;
@@ -223,7 +235,11 @@ experiment run_ecosystem type: gui {
 				data "Stock de gibier (sangliers)" value: stock_meat / 150.0 color: #darkred;
 			}
 
-			chart "Évolution de la surface dispo (en m2)" type: series size: {0.5, 0.5} position: {0.5, 0} {
+			chart "Évolution du stock d'eau (en milliards L)" type: series size: {0.5, 0.5} position: {0.5, 0} {
+				data "Stock d'eau" value: stock_water / 1e9 color: #blue;
+			}
+
+			chart "Évolution de la surface dispo (en m2)" type: series size: {0.5, 0.5} position: {0.5, 0.5} {
 				data "Surface libre" value: available_surface color: #yellow;
 			}
 
