@@ -203,6 +203,11 @@ species urbanplanning parent: bloc {
 		}
 
 		bool produce (map<string, float> demand) { // apply the input
+			
+			if(is_day_off){
+				return false;
+			}
+			
 			bool ok <- true;
 			list<map<string, float>> valeurs <- [];
 
