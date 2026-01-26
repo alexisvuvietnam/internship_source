@@ -100,7 +100,7 @@ species environnement parent: bloc {
 			tick_production_ECO <- producer.get_tick_outputs_produced(); // collect production
 			tick_absorbed_ECO <- producer.get_tick_emissions(); // collect emissions
 			//			write "tick_production_ECO: " + tick_production_ECO;
-			//			write "tick_absorded_ECO: " + tick_absorbed_ECO;
+						write "tick_absorded_ECO: " + tick_absorbed_ECO;
 			ask eco_producer { // prepare next tick on producer side
 				do reset_tick_counters;
 			}
@@ -196,7 +196,7 @@ species environnement parent: bloc {
 			/* Émission de GES (absorbtion dans le cas de l'écosystème) */
 			// Ajout d'une petite variation epsilon arbitraire
 			//float eps <- 1.0;
-			tick_emissions["gCO2e emissions"] <- -GES_absorbe_per_tick;
+			tick_emissions["gCO2e emissions"] <- stock_wood * 4.2e3; //absorption de gCO2 d'un m3 d'arbre par mois
 			return true; // production réussie
 		}
 
