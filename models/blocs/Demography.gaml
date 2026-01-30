@@ -164,9 +164,6 @@ species residents parent:bloc{
 		ask mini_cities {
 			do initialize_demographics;
 		}
-		
-		write "Population initialized: " + total_population + " people across " + length(mini_cities) + " mini-cities";
-		write "Gender distribution: " + total_males + " males, " + total_females + " females";
 	}
 	
 	/*
@@ -197,18 +194,18 @@ species mini_city_demography parent: mini_city {
 	int males <- 0;
 	int females <- 0;
 	
-	// Age distribution: map from age category to count
+	// age distribution: map from age category to count
 	map<int, int> age_distribution <- [];
 	
-	// Gender-specific age distributions
+	// gender-specific age distributions
 	map<string, map<int, int>> gender_age_distribution;
 	
-	// Tracking for statistics
+	// tracking for statistics
 	float births_this_year <- 0.0;
 	float deaths_this_year <- 0.0;
 	
 	/**
-	 * Initialize demographic structure based on population size and distributions
+	 * initialize demographic structure based on population size and distributions
 	 */
 	action initialize_demographics {
 	    male_gender <- "M";
@@ -231,7 +228,7 @@ species mini_city_demography parent: mini_city {
 	        map<int, float> age_probs <- init_age_distrib[gender];
 	
 	        if (age_probs = nil) {
-	            write "ERROR: Missing age distribution for gender " + gender;
+	            write "ERREUR: Distribution des ages manquante " + gender;
 	            continue;
 	        }
 	
@@ -263,7 +260,7 @@ species mini_city_demography parent: mini_city {
 	action apply_births {
 		float expected_births <- 0.0;
 		
-		// Calculate expected births from females in each age category
+		// calculate expected births in each age category
 		loop age_cat over: age_categories {
 			int female_count <- gender_age_distribution[female_gender][age_cat];
 			float birth_prob <- birth_proba[female_gender][age_cat];
@@ -272,11 +269,11 @@ species mini_city_demography parent: mini_city {
 			expected_births <- expected_births + (female_count * birth_prob);
 		}
 		
-		// Apply stochastic variation
+		// apply stochastic variation
 		int new_births <- int(expected_births) + (flip(expected_births - int(expected_births)) ? 1 : 0);
 		
 		if new_births > 0 {
-			// Add newborns (age 0)
+			// add newborns (age 0)
 			int new_males <- int(new_births * init_gender_distrib[male_gender]);
 			int new_females <- new_births - new_males;
 			
@@ -284,7 +281,7 @@ species mini_city_demography parent: mini_city {
 			females <- females + new_females;
 			pop <- pop + new_births;
 			
-			// Add to age 0 category
+			// add to age 0 category
 			age_distribution[0] <- (age_distribution[0]) + new_births;
 			gender_age_distribution[male_gender][0] <- (gender_age_distribution[male_gender][0]) + new_males;
 			gender_age_distribution[female_gender][0] <- (gender_age_distribution[female_gender][0]) + new_females;
@@ -305,7 +302,7 @@ species mini_city_demography parent: mini_city {
 			female_gender :: female_age_map
 		];
 		
-		// Calculate deaths for each gender and age category
+		// calculate deaths for each gender and age category
 		loop gender over: [male_gender, female_gender] {
 			loop age_cat over: age_categories {
 				int count <- gender_age_distribution[gender][age_cat];
@@ -323,7 +320,7 @@ species mini_city_demography parent: mini_city {
 			}
 		}
 		
-		// Apply deaths
+		// apply deaths
 		loop gender over: [male_gender, female_gender] {
 			loop age_cat over: age_categories {
 				int deaths <- deaths_by_gender_age[gender][age_cat];
@@ -348,7 +345,7 @@ species mini_city_demography parent: mini_city {
 	 * Age the population by moving people to next age categories
 	 */
 	action age_population {
-		// Create new age distributions
+		// create new age distributions
 		map<int, int> new_age_distribution <- [];
 		map<int, int> male_age_map <- age_categories as_map (each::0);
 		map<int, int> female_age_map <- age_categories as_map (each::0);
@@ -357,14 +354,14 @@ species mini_city_demography parent: mini_city {
 			female_gender :: female_age_map
 		];
 		
-		// Age each cohort
+		// age each cohort
 		loop gender over: [male_gender, female_gender] {
 			loop i from: 0 to: length(age_categories) - 1 {
 				int current_age <- age_categories[i];
 				int count <- gender_age_distribution[gender][current_age];
 				
 				if count > 0 {
-					// Move to next age category (or stay in last one)
+					// move to next age category (or stay in last one)
 					int next_age <- current_age;
 					if i < length(age_categories) - 1 {
 						next_age <- age_categories[i + 1];
@@ -403,12 +400,6 @@ experiment run_demography type: gui {
 				data "Males" value: total_males color: #red;
 				data "Females" value: total_females color: #blue;
 				data "Total population" value: total_population color: #black;
-			}
-			
-			chart "Age Pyramid" type: histogram background: #lightgray size: {0.5,0.5} position: {0, 0.5} {
-				loop age_label over: global_age_pyramid.keys {
-					data age_label value: global_age_pyramid[age_label] color: #blue;
-				}
 			}
 			
 			chart "Births and deaths" type: series size: {0.5,0.5} position: {0.5, 0} {
