@@ -73,11 +73,11 @@ global {
 	int mini_city_population <- 10000; // Average population per mini-city
 	
 	// Auto-calculated total population
-	int population_size <- number_of_mini_cities * mini_city_population 
+	int population_size <- 66793000
 	                      update: sum(mini_city collect each.pop);
 	
 	// City constellation parameters
-	int city_population <- 70000;
+	int city_population <- 70000; // TODO : replace with a value depending on shapefile
 	int nb_mini_cities_per_city update: int(city_population / mini_city_population);
 	
 	bool use_gis <- true;
