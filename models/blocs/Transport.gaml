@@ -294,28 +294,33 @@ species transport parent:bloc{
 	    	map<string, float> tick_usage_short <- [];
 	    	
 	    	// collect trip statistics
-	    	ask long {
-	    		tick_long_trips <- get_tick_trips();
-	    		tick_usage_long <- get_tick_usage();
-	    		map<string, float> long_energy <- get_tick_energy();
-	    		loop mode over: long_energy.keys {
-	    			if (tick_trip_energy[mode] = nil) {
-	    				tick_trip_energy[mode] <- 0.0;
-	    			}
-	    			tick_trip_energy[mode] <- long_energy[mode];
-	    		}
+	    	if (long != nil) {
+		    	ask long {
+		    		tick_long_trips <- get_tick_trips();
+		    		tick_usage_long <- get_tick_usage();
+		    		map<string, float> long_energy <- get_tick_energy();
+		    		loop mode over: long_energy.keys {
+		    			if (tick_trip_energy[mode] = nil) {
+		    				tick_trip_energy[mode] <- 0.0;
+		    			}
+		    			tick_trip_energy[mode] <- long_energy[mode];
+		    		}
+		    	}
 	    	}
-	    	ask short {
-	    		tick_short_trips <- get_tick_trips();
-	    		tick_usage_short <- get_tick_usage();
-	    		map<string, float> short_energy <- get_tick_energy();
-	    		loop mode over: short_energy.keys {
-	    			if (tick_trip_energy[mode] = nil) {
-	    				tick_trip_energy[mode] <- 0.0;
-	    			}
-	    			tick_trip_energy[mode] <- short_energy[mode];
-	    		}
-	    	}
+	    	
+			if (short != nil) {
+		    	ask short {
+		    		tick_short_trips <- get_tick_trips();
+		    		tick_usage_short <- get_tick_usage();
+		    		map<string, float> short_energy <- get_tick_energy();
+		    		loop mode over: short_energy.keys {
+		    			if (tick_trip_energy[mode] = nil) {
+		    				tick_trip_energy[mode] <- 0.0;
+		    			}
+		    			tick_trip_energy[mode] <- short_energy[mode];
+		    		}
+		    	}	
+		    }
 	    	loop mode over: tick_usage_long.keys{
 	    		transport_usage[mode] <- tick_usage_long[mode];
 	    	}
@@ -339,16 +344,22 @@ species transport parent:bloc{
 	    int short_trips <- int(nb_population * (nb_weeks_per_month * short_trips_per_week));
 	    
 	    // reset and process trips
-	    ask long {
-	        do reset_tick_counters();
-	        if (do_long_trips = true){
-	        	do process_long_trips(long_trips);
-	        }
-	    }
-	    ask short {
-	        do reset_tick_counters();
-	        do process_short_trips(short_trips);
-	    }
+	    if (long != nil) {
+		    ask long {
+		        do reset_tick_counters();
+		        if (do_long_trips) {
+		            do process_long_trips(long_trips);
+		        }
+		    }
+		}
+		
+		if (short != nil) {
+		    ask short {
+		        do reset_tick_counters();
+		        do process_short_trips(short_trips);
+		    }
+		}
+
 	    ask pop {
 	        ask myself.consumer {
 	            do consume(myself);

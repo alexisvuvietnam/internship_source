@@ -9,25 +9,80 @@ import "API/API.gaml"
 import "blocs/Demography.gaml"
 import "blocs/Agricultural.gaml"
 import "blocs/Energy.gaml"
-// import "blocs/Transport_GIS.gaml"
 import "blocs/Transport.gaml"
 import "blocs/Urbanplanning.gaml"
 import "blocs/Environnement.gaml"
 
+/*
+ * Species used for the generation of cities and mini-cities
+ */
+species cities {
+	file shape_file_cities;
+	geometry shape;
+	// Parameters for city generation asked to user :
+	int population_size; // number of people in the simulation
+	int number_of_mini_cities; // number of mini-cities
+	int city_population; // number of people per constellations of mini-cities
+	int number_of_cities;
+	int nb_mini_cities_per_city;
+	int mini_city_population;
+	list<mini_city_demography> mini_cities; // list of all mini-cities
+	list<main_city> main_cities; // list of all main-cities
+	float mini_city_distance_from_center <- 5.0 #km;
+
+	action generate_cities {
+		// 1. create cities (mini-city constellations)
+		create main_city from: shape_file_cities with: [city_name::read("name"), city_population::city_population];
+		main_cities <- list(main_city);
+		number_of_cities <- length(main_city);
+		nb_mini_cities_per_city <- int(city_population / mini_city_population);
+
+		// 2. create mini-cities around each constellations
+		ask main_city {
+			loop i from: 0 to: nb_mini_cities_per_city - 1 {
+				// Calculate the position for GIS
+				// Angle evenly spaced around the center 
+				// TODO : changer le placement des villes pour un placement aléatoire dans un rayon
+				float angle <- i * (360.0 / nb_mini_cities_per_city);
+				// Position with small random noise
+				float distance <- myself.mini_city_distance_from_center * (0.8 + rnd(0.4));
+				float angle_noise <- angle + rnd(-15.0, 15.0);
+				point offset <- {distance * cos(angle_noise), distance * sin(angle_noise)};
+				point mini_city_location <- location + offset;
+				
+				create mini_city_demography {
+					mini_city_name <- myself.city_name + "_MC" + i;
+					location <- mini_city_location;
+					parent_city <- myself; //reference to its parent
+					radius <- 1 #km; // radius of mini-cities
+					pop <- mini_city_population;
+					add self to: myself.mini_cities_list;
+				}
+			}
+		}
+		mini_cities <- list(mini_city_demography);
+	}
+}
 /**
- * This is the main section of the simulation. Here, we instanciate our blocs, and launch the simulation through the coordinator.
+ * Main section with aggregated population system.
+ * Population is controlled through city parameters and represented as integers.
  */
 global {
-// parameters for city generation
-	int population_size <- 1000000; // number of people in the simulation
-	int number_of_mini_cities <- 100; // number of mini-cities
-	int city_population <- 70000; // number of people per city (constellations of mini-cities)
-	int nb_mini_cities_per_city;
-	int mini_city_population <- 10000; // population of a mini-city (10000 by default according to CDC)
+	// Population control parameters - USER ADJUSTABLE
+	int number_of_mini_cities <- 100; // Number of mini-cities
+	int mini_city_population <- 10000; // Average population per mini-city
 	
-	bool use_gis <- false; // use GIS or not (needed to spatialise, instanciate territory species, and to display the map)
-	float step <- 1 #month; // the simulation step is a month
-	bool enable_demography <- true; // true to activate the demography (births, deaths), else false
+	// Auto-calculated total population
+	int population_size <- number_of_mini_cities * mini_city_population 
+	                      update: sum(mini_city collect each.pop);
+	
+	// City constellation parameters
+	int city_population <- 70000;
+	int nb_mini_cities_per_city update: int(city_population / mini_city_population);
+	
+	bool use_gis <- true;
+	float step <- 1 #month;
+	bool enable_demography <- true;
 
 	// GIS files
 	file shape_file_cities <- file("../includes/shapefiles/cities_france.shp");
@@ -38,45 +93,35 @@ global {
 	geometry shape <- envelope(shape_file_bounds);
 	geometry shape_cities <- envelope(shape_file_cities);
 
-	// Données pour chaque secteur
-
-	// Surface
+	// Sector data
 	float surface_used_agri <- 0.0;
 	float surface_used_env <- 0.0;
-	//	float surface_used_city <- 0.0;
 	float surface_used_energy <- 0.0;
-
-	// Eau
+	
 	float water_used_agri <- 0.0;
 	float water_used_energy <- 0.0;
-	//	float water_used_city <- 0.0;
-
-	// Énergie
+	
 	float energy_used_agri <- 0.0;
 	float energy_used_urban <- 0.0;
 	float energy_used_transport <- 0.0;
-	//	float energy_used_city <- 0.0;
-
-	// GES émis
+	
 	float GES_emissions_agri <- 0.0;
 	float GES_emissions_env <- 0.0;
-	//	float GES_emissions_city <- 0.0;
 	float GES_emissions_energy <- 0.0;
 	float GES_emissions_urban <- 0.0;
 	
 	cities city_generator;
-	
-	list<mini_city> mini_cities;
+	list<mini_city_demography> mini_cities;
 	list<main_city> main_cities;
 
 	init {
 		if (use_gis) {
-		// setup the territory :
+			// Setup territory with GIS
 			create fronteers from: shape_file_bounds;
 			create mountain from: shape_mountains;
 			create forest from: shape_file_forests;
 			create water_source from: shape_rivers_lakes;
-			// generation of the cities
+			
 			nb_mini_cities_per_city <- int(city_population / mini_city_population);
 			create cities number: 1 with:[
 				shape_file_cities::shape_file_cities,
@@ -93,19 +138,40 @@ global {
 				myself.mini_cities <- mini_cities;
 				myself.main_cities <- main_cities;
 			}
+			write "Created " + length(mini_cities) + " mini-cities with total initial population: " + sum(mini_cities collect each.pop);
+		} else {
+			// Generate cities without GIS for demographic purposes
+			nb_mini_cities_per_city <- int(city_population / mini_city_population);
+			
+			// Create mini_cities with initial population
+			loop i from: 0 to: number_of_mini_cities - 1 {
+				create mini_city_demography {
+					mini_city_name <- "City_" + i;
+					pop <- mini_city_population;
+					location <- {rnd(100), rnd(100)};
+					radius <- 1 #km;
+				}
+			}
+			mini_cities <- list(mini_city_demography);
+			write "Created " + length(mini_cities) + " mini-cities with total initial population: " + sum(mini_cities collect each.pop);
 		}
 
-		// instanciate the blocs (E, A and R blocs here):
-		create residents number: 1 {
-			enabled <- enable_demography;
-		}
+		// Create residents bloc with city references
+		// No individual agents will be created - population is aggregated at city level
+		create residents number: 1 with: [
+			enabled::enable_demography,
+			mini_cities::mini_cities,
+			main_cities::main_cities
+		];
 
+		// Other blocs can access population through mini_cities or total population
 		create agricultural number: 1 {
 			pop_size <- population_size;
 		}
 
 		create energy number: 1;
 		create urbanplanning number: 1;
+		
 		create transport number: 1 with: [
 			use_gis::use_gis,
 			mini_cities::mini_cities,
@@ -115,7 +181,6 @@ global {
 			mini_city_population::mini_city_population
 		];
 
-		// L'environnement gère les mini-villes
 		create environnement number: 1 {
 			population <- population_size;
 		}
@@ -129,13 +194,13 @@ global {
 }
 
 /**
- * We define only one experiment in the main file : the display of the GIS. 
- * Other displays are defined in the blocs experiments.
+ * GIS display experiment
  */
 experiment display_gis type: gui {
-	parameter "Taille de la population :" var: population_size category: 'Model';
-	parameter "Nombre de mini-villes :" var: number_of_mini_cities category: 'Model';
-	parameter "Nombre d'individus par constellation de mini-villes:" var: city_population category: 'Model';
+	parameter "Nombre de mini-villes :" var: number_of_mini_cities category: 'Model' min: 1;
+	parameter "Population par mini-ville :" var: mini_city_population category: 'Model' min: 100;
+	parameter "Nombre d'individus par constellation :" var: city_population category: 'Model';
+	
 	output {
 		display country_map type: java2D {
 			species fronteers aspect: base;
@@ -149,13 +214,20 @@ experiment display_gis type: gui {
 	}
 }
 
+/**
+ * Main experiment with population monitoring
+ */
 experiment main_experiment type: gui {
-//	float	total_emission <- world.tick_emissions_A["gCO2e emissions"] + world.tick_emissions_U["gCO2e emissions"] + world.tick_emissions_E["gCO2e emissions"] + world.tick_emissions_T["gCO2e emissions"] + world.tick_absorbed_ECO["gCO2e emissions"];
-	parameter "Taille de la population :" var: population_size category: 'Model';
-	//	parameter "Nombre de mini-villes :" var: number_of_mini_cities category: 'Model';
-	//	parameter "Nombre d'individus par constellation de mini-villes:" var: city_population category: 'Model';	
+	parameter "Nombre de mini-villes :" var: number_of_mini_cities category: 'Model' min: 1;
+	parameter "Population par mini-ville (initial) :" var: mini_city_population category: 'Model' min: 100;
+	
 	output {
-	// Monitor des différentes valeurs
+		// Population monitors
+		monitor "Population totale actuelle" value: population_size;
+		monitor "Nombre de mini-villes" value: length(mini_city);
+		monitor "Population moyenne par ville" value: length(mini_city) > 0 ? int(population_size / length(mini_city)) : 0;
+		
+		// Resource monitors
 		monitor "Énergie consommée agriculture" value: world.tick_resources_used_A["kWh energy"];
 		monitor "Énergie consommée urbanisme" value: world.tick_resources_used_U["kWh energy"];
 		monitor "Énergie consommée transport" value: world.tick_resources_used_T["kWh energy"];
@@ -167,7 +239,7 @@ experiment main_experiment type: gui {
 		monitor "GES émis transport" value: world.tick_emissions_T["gCO2e emissions"];
 		monitor "GES absorbés par l'environnement" value: world.tick_absorbed_ECO["gCO2e emissions"];
 
-		// Affichage de la consommation d'énergie
+		// Energy consumption displays
 		display "Répartition de la consommation d'énergie pour chaque secteur" type: 2d {
 			chart "Consommation d'énergie pour chaque secteur" type: pie {
 				data "Agriculture" value: world.tick_resources_used_A["kWh energy"] color: #orange;
@@ -184,7 +256,7 @@ experiment main_experiment type: gui {
 			}
 		}
 
-		// Affichage de la consommation d'eau
+		// Water consumption displays
 		display "Répartition de la consommation d'eau pour chaque secteur" type: 2d {
 			chart "Consommation d'eau pour chaque secteur" type: pie {
 				data "Agriculture" value: world.tick_resources_used_A["L water"] color: #orange;
@@ -199,7 +271,7 @@ experiment main_experiment type: gui {
 			}
 		}
 
-		// Affichage des GES
+		// GHG emissions displays
 		display "Répartition de la production de GES pour chaque secteur" type: 2d {
 			chart "Quantité de GES émis pour chaque secteur (en grammes)" type: pie {
 				data "Agriculture" value: world.tick_emissions_A["gCO2e emissions"] color: #orange;
@@ -214,12 +286,13 @@ experiment main_experiment type: gui {
 				data "Urbanisme" value: world.tick_emissions_U["gCO2e emissions"] color: #gray;
 				data "Energie" value: world.tick_emissions_E["gCO2e emissions"] color: #yellow;
 				data "Transport" value: world.tick_emissions_T["gCO2e emissions"] color: #blue;
-				data "Environnement" value: world.tick_absorbed_ECO["gCO2e emissions"] color: #green; // Ne s'affiche pas pour les données négatives
+				data "Environnement" value: world.tick_absorbed_ECO["gCO2e emissions"] color: #green;
 				data "Total" value:
-				world.tick_emissions_A["gCO2e emissions"] + world.tick_emissions_U["gCO2e emissions"] + world.tick_emissions_E["gCO2e emissions"] + world.tick_emissions_T["gCO2e emissions"] + world.tick_absorbed_ECO["gCO2e emissions"]
+				world.tick_emissions_A["gCO2e emissions"] + world.tick_emissions_U["gCO2e emissions"] + 
+				world.tick_emissions_E["gCO2e emissions"] + world.tick_emissions_T["gCO2e emissions"] + 
+				world.tick_absorbed_ECO["gCO2e emissions"]
 				color: #black;
 			}
 		}
 	}
 }
-
