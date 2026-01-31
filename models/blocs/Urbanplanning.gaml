@@ -19,11 +19,9 @@ global {
 	/* Production data */
 	// TODO : adapter les production et le cout de celle ci sur les bonnes
 	map<string, map<string, float>>
-	production_output_inputs_U <- ["modular_house_lobby"::["m3_wood"::0.0, "kg_plastic"::3000.0], "modular_house_extension"::["m3_wood"::0.0, "kg_plastic"::600.0], "wooden_building"::["m3_wood"::80.0, "kg_plastic"::0.0], "plastic_factory"::["m3_wood"::184000.0, "kg_plastic"::42000000.0], "kg_plastic"::["kg_coton"::16.5, "kWh energy"::6.0]];
-	map<string, map<string, float>>
-	production_output_emissions_U <- ["modular_house_lobby"::["gCO2e emissions"::1000000.0], "modular_house_extension"::["gCO2e emissions"::30000.0], "wooden_building"::["gCO2e emissions"::300000.0], "plastic_factory"::["gCO2e emissions"::50000000.0], "kg_plastic"::["gCO2e emissions"::0.0]];
-	map<string, map<string, float>>
-	supply_upkeep_U <- ["modular_house_lobby"::["m² land"::0.0], "modular_house_extension"::["m² land"::50.0], "wooden_building"::["m² land"::100.0], "plastic_factory"::["m² land"::1000000.0]];
+	production_output_inputs_U <- ["modular_house_lobby"::["m3_wood"::0.0, "kg_plastic"::129100.0], "modular_house_extension"::["m3_wood"::0.0, "kg_plastic"::38323.0], "wooden_building"::["m3_wood"::624.0, "kg_plastic"::0.0], "plastic_factory"::["m3_wood"::184000.0, "kg_plastic"::42000000.0], "kg_plastic"::["kg_coton"::16.5, "kWh energy"::6.0]];
+	map<string, map<string, float>> production_output_emissions_U <- ["modular_house_lobby"::["gCO2e emissions"::1000000.0], "modular_house_extension"::["gCO2e emissions"::30000.0], "wooden_building"::["gCO2e emissions"::300000.0], "plastic_factory"::["gCO2e emissions"::50000000.0], "kg_plastic"::["gCO2e emissions"::0.0]];
+	map<string, map<string, float>>	supply_upkeep_U <- ["modular_house_lobby"::["m² land"::0.0, "kg_plastic"::1291.0], "modular_house_extension"::["m² land"::50.0, "m3_wood"::0.0, "kg_plastic"::383.23], "wooden_building"::["m² land"::100.0, "m3_wood"::6.24, "kg_plastic"::0.0], "plastic_factory"::["m² land"::1000000.0]];
 	float factory_production_capacity <- 11000000.0;
 	map<string, float> individual_consumption_U <- ["modular_house_extension"::1.0, "modular_house_lobby"::0.05, "wooden_building"::0.000175];
 	
@@ -76,12 +74,12 @@ species urbanplanning parent: bloc {
 		
 		loop c over: mini_cities {
 		    loop i over: individual_consumption_U.keys {
-		        c.building_supplies[i] <- (c.pop * individual_consumption_U[i])/2;
+		        c.building_supply[i] <- c.pop * individual_consumption_U[i];
 		    }
 		}
 		
 		loop c over: mini_cities {
-		    write c.building_supplies;
+		    write c.building_supply;
 		}
 
 		
@@ -94,7 +92,9 @@ species urbanplanning parent: bloc {
 
 	action tick (list<human> pop) {
 		do collect_last_tick_data();
-		do population_activity(pop);
+//		do population_activity(pop);
+		do calculate_minicities_demand();
+		do calculate_minicities_production();
 	}
 
 	production_agent get_producer {
@@ -137,6 +137,23 @@ species urbanplanning parent: bloc {
 
 		}
 
+	}
+	
+	action calculate_minicities_production{
+		loop mini_ville over: mini_cities{
+			ask urban_producer{			
+			    do produce_city(mini_ville);
+			}
+		}
+	}
+	
+	action calculate_minicities_demand{
+		loop mini_ville over: mini_cities{
+		    loop i over: individual_consumption_U.keys {
+				mini_ville.demand[i] <- mini_ville.pop * individual_consumption_U[i];
+				mini_ville.shortage[i] <- mini_ville.demand[i] - mini_ville.building_supply[i];
+		    }
+		}
 	}
 
 	action population_activity (list<human> pop) {
@@ -226,6 +243,85 @@ species urbanplanning parent: bloc {
 			}
 
 		}
+		
+		bool produce_city(mini_city mini_ville){
+			bool ok <- true;
+			
+			loop c over: mini_ville.shortage.keys {
+				
+				// needs (resources consumed/emitted) for this demand
+				loop u over: production_inputs_U {
+					float quantity_needed <- production_output_inputs_U[c][u] * mini_ville.shortage[c]; // quantify the resources consumed/emitted by this demand
+
+					// Gestion cout d'entretient
+					if (supply_upkeep_U.keys contains c) {
+						map<string, float> upkeep_requirements <- supply_upkeep_U[c];
+						if (upkeep_requirements.keys contains u) {
+							float upkeep_cost <- mini_ville.building_supply[c] * upkeep_requirements[u];
+							quantity_needed <- quantity_needed + upkeep_cost;
+						}
+					}
+
+					// Global indicator
+					tick_resources_used[u] <- tick_resources_used[u] + quantity_needed;
+					
+//					if(tick_resources_used[u] > 0){						
+//						write "Ressource current : "+u;
+//						write tick_resources_used[u];
+//						write quantity_needed;
+//						write "Shortage of this city : "+mini_ville.shortage[c];
+//						write "Population of this city : "+mini_ville.pop;
+//					}
+
+					
+					mini_ville.tick_resources_used[u] <- mini_ville.tick_resources_used[u] + quantity_needed;
+					if (!(autoproduction_U contains u)) {
+						if (external_producers.keys contains u and quantity_needed > 0) { // if there is a known external producer for this product/good
+							bool av <- external_producers[u].producer.produce([u::quantity_needed]); // ask the external producer to product the required quantity
+							if not av {
+								ok <- false;
+							}
+
+						}
+
+					}
+
+				}
+				
+				
+				// Autoproduction de plastique
+				loop a over: autoproduction_U {
+					float quantity_needed <- production_output_inputs_U[c][a] * mini_ville.shortage[c]; // quantify the resources consumed/emitted by this demand
+
+					// Gestion cout d'entretient
+					if (supply_upkeep_U.keys contains c) {
+						map<string, float> upkeep_requirements <- supply_upkeep_U[c];
+						if (upkeep_requirements.keys contains a) {
+							float upkeep_cost <- mini_ville.building_supply[c] * upkeep_requirements[a];
+							quantity_needed <- quantity_needed + upkeep_cost;
+						}
+					}
+					
+					// Global indicators
+					tick_production[a] <- tick_production[a] + quantity_needed;
+					tick_resources_used[a] <- tick_resources_used[a] + quantity_needed;
+					
+					mini_ville.tick_production[a] <- mini_ville.tick_resources_used[a] + quantity_needed;
+					mini_ville.tick_resources_used[a] <- mini_ville.tick_resources_used[a] + quantity_needed;
+					
+					loop u over: production_output_inputs_U[a].keys {
+						tick_resources_used[u] <- tick_resources_used[u] + production_output_inputs_U[a][u] * quantity_needed;
+						mini_ville.tick_resources_used[a] <- production_output_inputs_U[a][u] * quantity_needed;
+					}
+					
+				}
+				
+				
+				
+			}
+			
+			return ok;
+		}
 
 		bool produce (map<string, float> demand) { // apply the input
 			
@@ -292,7 +388,6 @@ species urbanplanning parent: bloc {
 					loop u over: production_output_inputs_U[a].keys {
 						tick_resources_used[u] <- tick_resources_used[u] + production_output_inputs_U[a][u] * quantity_needed;
 					}
-
 				}
 
 				loop e over: production_emissions_U { // apply emissions
@@ -429,18 +524,18 @@ experiment run_urban type: gui {
 				loop c over: production_outputs_U {
 					data c value: tick_production_U[c];
 				}
-				//loop a over: autoproduction_U{
-				//data a value: tick_production_U[a];
-				//}
+				loop a over: autoproduction_U{
+					data a value: tick_production_U[a];
+				}
 			}
 
 			chart "Resources usage" type: series size: {0.5, 0.5} position: {0, 0.5} {
 				loop r over: production_inputs_U {
 					data r value: tick_resources_used_U[r];
 				}
-				//loop a over: autoproduction_U{
-				//data a value: tick_resources_used_U[a];
-				//}
+				loop a over: autoproduction_U{
+					data a value: tick_resources_used_U[a];
+				}
 			}
 
 			chart "Production emissions" type: series size: {0.5, 0.5} position: {0.5, 0.5} {

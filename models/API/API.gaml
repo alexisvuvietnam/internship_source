@@ -332,7 +332,16 @@ species mini_city {
 	int pop <- 0 min: 40 max: 50000; // de 40 à 50000 habitants
 	list<mini_city> connected_mini_cities;
 	
-	map<string, float> building_supplies <- [];
+	// Urbanisme
+	map<string, float> building_supply <- [];
+	map<string, float> demand <- [];
+	map<string, float> shortage <- [];
+	
+	map<string, float> tick_resources_used <- [];
+	map<string, float> tick_production <- [];
+	map<string, float> tick_emissions <- [];
+	map<string, float> tick_demand <- [];
+	
 
 	// --- GIS
 	int degree update: length(connected_mini_cities);
