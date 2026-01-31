@@ -30,7 +30,7 @@ global {
 	float kg_mouflon <- 3000 * 37.5 /12;
 	float kg_daim <- 2000 * 60.0 /12 ;
 	float kg_csika <- 80 * 50.0 /12;
-	float kg_gibier <- kg_sanglier + kg_cerf + kg_chevreuil + kg_chamois + kg_isard + kg_mouflon + kg_daim + kg_csika ;
+	float kg_gibier_monthly <- kg_sanglier + kg_cerf + kg_chevreuil + kg_chamois + kg_isard + kg_mouflon + kg_daim + kg_csika ;
 
 	/* Production data */
 	map<string, map<string, float>>
@@ -101,8 +101,8 @@ species agricultural parent: bloc {
 	float min_farm_surface_m2 <- 5.0 * 1e4;
 	
 	// Farm distribution parameters
-    float meat_farm_ratio <- 0.15;
-    float veg_farm_ratio <- 0.45;
+    float meat_farm_ratio <- 0.12;
+    float veg_farm_ratio <- 0.48;
     float mixed_farm_ratio <- 0.25;
     float cotton_farm_ratio <- 0.15;
 
@@ -222,13 +222,14 @@ species agricultural parent: bloc {
 	// ----- actions for init creation of farms -----
 	
 	action calculate_initial_farms {
-        float monthly_meat_demand <- indivudual_consumption_A["kg_meat"] * pop_size;
+        float monthly_meat_demand_total <- indivudual_consumption_A["kg_meat"] * pop_size;
+        float monthly_meat_demand_farms <- max(0, monthly_meat_demand_total - kg_gibier_monthly);
         float monthly_veg_demand <- indivudual_consumption_A["kg_vegetables"] * pop_size;
         float init_monthly_cotton_demand <- 50000 * 1e3; // hypothèse : init de 50 000 tonnes
         
         // Calculate surface needed (with safety margin of 20%)
         float safety_margin <- 1.2;
-        float surface_needed_meat <- monthly_meat_demand * production_output_inputs_A["kg_meat"]["m² land"] * safety_margin;
+        float surface_needed_meat <- monthly_meat_demand_farms * production_output_inputs_A["kg_meat"]["m² land"] * safety_margin;
         float surface_needed_veg <- monthly_veg_demand * production_output_inputs_A["kg_vegetables"]["m² land"] * safety_margin;
         float surface_needed_cotton <- init_monthly_cotton_demand * production_output_inputs_A["kg_cotton"]["m² land"] * safety_margin;
         float total_surface_needed <- surface_needed_meat + surface_needed_veg + surface_needed_cotton;
@@ -243,14 +244,15 @@ species agricultural parent: bloc {
         
         write "Agricultural setup: Creating " + nb_farms_needed + " farms";
         write "  - Total surface needed: " + total_surface_needed + " m²";
-        write "  - Meat demand: " + monthly_meat_demand + " kg/month";
+        write "  - Meat demand: " + monthly_meat_demand_total + " kg/month";
+        write "    - Origin farms: " + round((monthly_meat_demand_farms/monthly_meat_demand_total) * 100) + " %";
+        write "    - Origin gibier: " + round((kg_gibier_monthly/monthly_meat_demand_total) * 100) + " %";
         write "  - Vegetables demand: " + monthly_veg_demand + " kg/month";
         
         // Create farms with appropriate types and sizes
         do create_initial_farms(nb_farms_needed, surface_needed_meat, surface_needed_veg, surface_needed_cotton);
     }
-    
-    /* TODO what to do with cotton farms */
+
     action create_initial_farms(int nb_farms, float meat_surface, float veg_surface, float cotton_surface) {
         // Calculate number of each farm type
         int nb_meat_farms <- int(ceil(nb_farms * meat_farm_ratio));
