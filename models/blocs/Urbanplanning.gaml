@@ -25,7 +25,8 @@ global {
 	map<string, map<string, float>>
 	supply_upkeep_U <- ["modular_house_lobby"::["m² land"::0.0], "modular_house_extension"::["m² land"::50.0], "wooden_building"::["m² land"::100.0], "plastic_factory"::["m² land"::1000000.0]];
 	float factory_production_capacity <- 11000000.0;
-	map<string, float> indivudual_consumption_U <- ["modular_house_extension"::1.0, "modular_house_lobby"::0.05, "wooden_building"::0.000175];
+	map<string, float> individual_consumption_U <- ["modular_house_extension"::1.0, "modular_house_lobby"::0.05, "wooden_building"::0.000175];
+	
 	map<string, float> supplies_U <- ["modular_house_extension"::70000000.0, "modular_house_lobby"::3500000.0, "wooden_building"::1400.0, "plastic_factory"::10.0];
 	map<string, int> time_cost_U <- ["modular_house_extension"::1, "modular_house_lobby"::3, "wooden_building"::6, "plastic_factory"::48];
 
@@ -35,6 +36,8 @@ global {
 	map<string, float> tick_resources_used_U <- [];
 	map<string, float> tick_emissions_U <- [];
 	list<map<string, float>> production_history_U <- [];
+	
+	list<mini_city> mini_cities <- [];
 
 	init { // a security added to avoid launching an experiment without the other blocs
 		if (length(coordinator) = 0) {
@@ -58,9 +61,31 @@ species urbanplanning parent: bloc {
 	map<string, int> to_build <- [];
 	float plastic_budget <- factory_production_capacity * supplies_U["plastic_factory"];
 
+
 	action setup {
 		list<urban_producer> producers <- [];
 		list<urban_consumer> consumers <- [];
+		
+		int total_mini_cities <- length(mini_cities);
+		// verification that the number of mini-cities isnt lower than 3
+		if total_mini_cities < 3 {
+			write "ERREUR: Pas assez de mini-villes (" + total_mini_cities + "). Minimum: 3";
+			return;
+		}
+		write total_mini_cities;
+		
+		loop c over: mini_cities {
+		    loop i over: individual_consumption_U.keys {
+		        c.building_supplies[i] <- (c.pop * individual_consumption_U[i])/2;
+		    }
+		}
+		
+		loop c over: mini_cities {
+		    write c.building_supplies;
+		}
+
+		
+		
 		create urban_producer number: 1 returns: producers;
 		create urban_consumer number: 1 returns: consumers;
 		producer <- first(producers);
@@ -125,7 +150,7 @@ species urbanplanning parent: bloc {
 		plastic_budget <- factory_production_capacity * supplies_U["plastic_factory"];
 		ask urban_consumer { // produce the resuired quantities
 			ask urban_producer {
-			// Battiments non-individuels
+				// Battiments non-individuels
 				loop p over: to_build.keys {
 					do produce([p::to_build[p]]);
 				}
@@ -204,9 +229,9 @@ species urbanplanning parent: bloc {
 
 		bool produce (map<string, float> demand) { // apply the input
 			
-			if(is_day_off){
-				return false;
-			}
+//			if(is_day_off){
+//				return false;
+//			}
 			
 			bool ok <- true;
 			list<map<string, float>> valeurs <- [];
@@ -346,8 +371,8 @@ species urbanplanning parent: bloc {
 		}
 
 		action consume (human h) {
-			loop c over: indivudual_consumption_U.keys {
-				consumed[c] <- consumed[c] + (indivudual_consumption_U[c] * 7000); // Chaque habitant en représente 7000
+			loop c over: individual_consumption_U.keys {
+				consumed[c] <- consumed[c] + (individual_consumption_U[c] * 7000); // Chaque habitant en représente 7000
 			}
 
 		}

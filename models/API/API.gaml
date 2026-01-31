@@ -331,6 +331,8 @@ species mini_city {
 	float surface <- radius * radius * 3.14; // Calcul de la surface
 	int pop <- 0 min: 40 max: 50000; // de 40 à 50000 habitants
 	list<mini_city> connected_mini_cities;
+	
+	map<string, float> building_supplies <- [];
 
 	// --- GIS
 	int degree update: length(connected_mini_cities);
