@@ -346,6 +346,9 @@ species mini_city {
 	map<string, float> tick_emissions <- [];
 	map<string, float> tick_demand <- [];
 	
+	int go_to_school;
+	int go_to_work;
+	
 
 	// --- GIS
 	int degree update: length(connected_mini_cities);
