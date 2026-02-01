@@ -30,7 +30,7 @@ global {
 	
 	map<string, float> supplies_U <- ["modular_house_extension"::70000000.0, "modular_house_lobby"::3500000.0, "wooden_building"::1400.0, "plastic_factory"::10.0];
 	
-	map<string, int> time_cost_U <- ["modular_house_extension"::4, "modular_house_lobby"::4, "wooden_building"::11, "plastic_factory"::48, "centre_loisir"::4];
+	map<string, int> time_cost_U <- ["modular_house_extension"::4, "modular_house_lobby"::4, "wooden_building"::11, "plastic_factory"::48, "centre_loisir"::4, "school"::12];
 
 	/* Counters & Stats */
 	map<string, float> tick_production_U <- [];
@@ -40,9 +40,6 @@ global {
 	list<map<string, float>> production_history_U <- [];
 	
 	list<mini_city> mini_cities <- [];
-	
-	int go_to_school <- 0;
-	int go_to_work <- 0;
 
 	init { // a security added to avoid launching an experiment without the other blocs
 		if (length(coordinator) = 0) {
@@ -84,7 +81,7 @@ species urbanplanning parent: bloc {
 		        c.building_supply[i] <- (c.pop * individual_consumption_U[i])/2.0;
 		        c.potential_building_supply[i] <- c.building_supply[i];
 		    }
-		    c.building_supply["school"] <- c.go_to_school/500.0;
+		    c.building_supply["school"] <- 0.0;
 		    c.potential_building_supply["school"] <- c.building_supply["school"];
 		}
 		
@@ -161,10 +158,10 @@ species urbanplanning parent: bloc {
 	action calculate_minicities_demand{
 		loop mini_ville over: mini_cities{
 		    loop i over: individual_consumption_U.keys {
-				mini_ville.demand[i] <- mini_ville.pop * individual_consumption_U[i];
+				mini_ville.demand[i] <- mini_ville.pop * individual_consumption_U[i] + 20000;
 				mini_ville.shortage[i] <- mini_ville.demand[i] - mini_ville.building_supply[i];
 		    }
-		    mini_ville.demand["school"] <- mini_ville.go_to_school/500.0;
+		    mini_ville.demand["school"] <- mini_ville.go_to_school/500.0 + 1;
 		    mini_ville.shortage["school"] <- mini_ville.demand["school"] - mini_ville.building_supply["school"];
 		}
 	}
