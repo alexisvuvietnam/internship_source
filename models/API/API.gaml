@@ -336,6 +336,8 @@ species mini_city {
 	map<string, float> building_supply <- [];
 	map<string, float> demand <- [];
 	map<string, float> shortage <- [];
+	map<string, list> building_queue <- [];
+	
 	
 	map<string, float> tick_resources_used <- [];
 	map<string, float> tick_production <- [];

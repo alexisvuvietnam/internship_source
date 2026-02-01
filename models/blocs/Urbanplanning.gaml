@@ -13,13 +13,13 @@ global {
 
 	// Config
 	float wooden_building_ratio <- 0.4;
-
-// TODO : adapter les productions et les ressources demandées sur les vrais variables et valeurs
+	
+	// TODO : adapter les productions et les ressources demandées sur les vrais variables et valeurs
 	list<string> production_inputs_U <- ["m3_wood", "kWh energy", "kg_coton", "m² land"];
 	list<string> production_outputs_U <- ["modular_house_lobby", "modular_house_extension", "wooden_building"];
 	list<string> autoproduction_U <- ["kg_plastic"];
 	list<string> production_emissions_U <- ["gCO2e emissions"];
-
+	
 	/* Production data */
 	// TODO : adapter les production et le cout de celle ci sur les bonnes
 	map<string, map<string, float>>
@@ -30,6 +30,7 @@ global {
 	map<string, float> individual_consumption_U <- ["modular_house_extension"::1.0*(1-wooden_building_ratio), "modular_house_lobby"::0.05*(1-wooden_building_ratio), "wooden_building"::0.0208*wooden_building_ratio];
 	
 	map<string, float> supplies_U <- ["modular_house_extension"::70000000.0, "modular_house_lobby"::3500000.0, "wooden_building"::1400.0, "plastic_factory"::10.0];
+	
 	map<string, int> time_cost_U <- ["modular_house_extension"::1, "modular_house_lobby"::3, "wooden_building"::6, "plastic_factory"::48];
 
 	/* Counters & Stats */
@@ -78,7 +79,7 @@ species urbanplanning parent: bloc {
 		
 		loop c over: mini_cities {
 		    loop i over: individual_consumption_U.keys {
-		        c.building_supply[i] <- c.pop * individual_consumption_U[i];
+		        c.building_supply[i] <- (c.pop * individual_consumption_U[i])/2.0;
 		    }
 		}
 		
@@ -193,6 +194,12 @@ species urbanplanning parent: bloc {
 
 		}
 
+	}
+
+	species building_project {
+	    string building;
+	    float quantity;
+	    int completion_time;
 	}
 
 	/**
@@ -320,12 +327,20 @@ species urbanplanning parent: bloc {
 					
 				}
 				
+				// apply emissions
+				loop e over: production_emissions_U { 
+					float quantity_emitted <- production_output_emissions_U[c][e] * mini_ville.shortage[c];
+					tick_emissions[e] <- tick_emissions[e] + quantity_emitted;
+				}
+
+			
+				
+				mini_ville.tick_production[c] <- mini_ville.shortage[c];
+				tick_production[c] <- tick_production[c] + mini_ville.shortage[c];
+				
 				
 				
 			}
-			
-			write "wood used :";
-			write tick_resources_used["m3_wood"];
 			
 			return ok;
 		}
