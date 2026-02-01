@@ -105,9 +105,9 @@ species agricultural parent: bloc {
 	
 	// Farm distribution parameters
     float meat_farm_ratio <- 0.25;
-    float veg_farm_ratio <- 0.4;
+    float veg_farm_ratio <- 0.35;
     float mixed_farm_ratio <- 0.2;
-    float cotton_farm_ratio <- 0.15;
+    float cotton_farm_ratio <- 0.2;
 
 	action setup {
 		list<agri_producer> producers <- [];
@@ -206,7 +206,7 @@ species agricultural parent: bloc {
 	
 	/* Modelises the production and consumption of products by the population */
 	action population_activity (list<human> pop) {
-		write "Pop_size " + length(pop);
+		//write "Pop_size " + length(pop);
 		ask pop { // execute the consumption behavior of the population
 			ask myself.agri_consumer {
 				do consume(myself); // individuals consume agricultural goods
@@ -217,7 +217,7 @@ species agricultural parent: bloc {
 			float total_meat_demand <- consumed["kg_meat"];
             float remaining_meat_demand <- max(0, total_meat_demand - kg_gibier_monthly);
             
-            write "Demand MEAT from population (minus gibier supply) " + remaining_meat_demand;
+            //write "Demand MEAT from population (minus gibier supply) " + remaining_meat_demand;
             
 			ask agri_producer {
 				/*loop c over: myself.consumed.keys {
@@ -252,7 +252,7 @@ species agricultural parent: bloc {
                 	if (c = "kg_meat"){
                 		ok <- produce(["kg_meat"::remaining_meat_demand]);
                 	} else {
-                		write "Produce what ? " + c;
+                		//write "Produce what ? " + c;
                 		ok <- produce([c::myself.consumed[c]]);
                 	}
                 	
@@ -297,6 +297,7 @@ species agricultural parent: bloc {
         write "    - Origin farms: " + round((monthly_meat_demand_farms/monthly_meat_demand_total) * 100) + " %";
         write "    - Origin gibier: " + round((kg_gibier_monthly/monthly_meat_demand_total) * 100) + " %";
         write "  - Vegetables demand: " + monthly_veg_demand + " kg/month";
+        write "  - Cotton demand: " + init_monthly_cotton_demand + " kg/month";
         
         // Create farms with appropriate types and sizes
         do create_initial_farms(nb_farms_needed, surface_needed_meat, surface_needed_veg, surface_needed_cotton);
@@ -575,17 +576,17 @@ species agricultural parent: bloc {
 		/* Checks if we are answering the demand with our stocks (also contains production of the tick) */
 		bool produce(map<string, float> demand) {
 			bool ok <- true;
-			write "** Action produce - before demand, meat_stock " + products_stock["kg_meat"];
+			//write "** Action produce - before demand, meat_stock " + products_stock["kg_meat"];
 			loop c over: demand.keys {
-				write " What is c from demand.keys ? " + c + " And how much ? " + demand[c];
+				//write " What is c from demand.keys ? " + c + " And how much ? " + demand[c];
 				if (products_stock[c] >= demand[c]) {
-					write " ----- HELLO ----";
+					//write " ----- HELLO ----";
 					products_stock[c] <- products_stock[c] - demand[c];
 				} else {
 					ok <- false;
 				}
 			}
-			write "** Action produce - after demand, meat_stock " + products_stock["kg_meat"];
+			//write "** Action produce - after demand, meat_stock " + products_stock["kg_meat"];
 			
 			return ok;
 		}
@@ -710,8 +711,8 @@ species farm {
 		}
 	
 		if (farm_type = "mixed") {
-			production_capacity["kg_meat"] <- surface_m2 * 0.4;
-			production_capacity["kg_vegetables"] <- surface_m2 * 0.6;
+			production_capacity["kg_meat"] <- surface_m2 * 0.5;
+			production_capacity["kg_vegetables"] <- surface_m2 * 0.5;
 		}
 	      
 	}
@@ -787,7 +788,7 @@ experiment run_agricultural type: gui {
 //				}
 				data "kg_meat" value: products_stock_A["kg_meat"];
 				data "dg_vegetables (10 kg)" value: products_stock_A["kg_vegetables"]/10 ;
-				data "kg_cotton" value: tick_resources_used_A["kg_cotton"];
+				data "kg_cotton" value: products_stock_A["kg_cotton"];
 			}
 
 			chart "Total production" type: series size: {0.5, 0.5} position: {0.5, 0} {
@@ -818,9 +819,8 @@ experiment run_agricultural type: gui {
 
 		display Population_information {
 			chart "Population direct consumption" type: series size: {0.5, 0.5} position: {0.25, 0} {
-				loop c over: production_outputs_A {
-					data c value: tick_pop_consumption_A[c]; // note : products consumed by other blocs NOT included here (only population direct consumption)
-				}
+				data "kg_meat" value: tick_pop_consumption_A["kg_meat"];
+				data "kg_vegetables" value: tick_pop_consumption_A["kg_vegetables"];
 
 			}
 			
