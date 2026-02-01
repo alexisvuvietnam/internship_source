@@ -80,6 +80,7 @@ species urbanplanning parent: bloc {
 		loop c over: mini_cities {
 		    loop i over: individual_consumption_U.keys {
 		        c.building_supply[i] <- (c.pop * individual_consumption_U[i])/2.0;
+		        c.potential_building_supply[i] <- c.building_supply[i];
 		    }
 		}
 		
@@ -356,9 +357,19 @@ species urbanplanning parent: bloc {
 			
 				
 				mini_ville.tick_production[c] <- mini_ville.shortage[c];
-				// Ajout de la pénurie a la file de construction
-				mini_ville.building_queue[c + "_" + time_cost_U[c]] <- [c, mini_ville.shortage[c], time_cost_U[c]];
 				tick_production[c] <- tick_production[c] + mini_ville.shortage[c];
+				
+				// Si les chantiers actuels ne sont pas assez pour répondre a la pénurie, on en crée PLUS
+				// Sinon on créerais de nouveaux chantiers tout le temps
+				if(mini_ville.building_supply[c] + mini_ville.shortage[c] > mini_ville.potential_building_supply[c]){
+					float left_to_build <- mini_ville.shortage[c] - (mini_ville.potential_building_supply[c] - mini_ville.building_supply[c]);
+					
+					
+					// Ajout du nombre de batiment a construire pour régler la pénurie dans la file de construction
+					mini_ville.building_queue[c + "_" + time_cost_U[c]] <- [c, left_to_build, time_cost_U[c]];
+					mini_ville.potential_building_supply[c] <- mini_ville.potential_building_supply[c] + left_to_build;
+					
+				}
 				
 				
 				
