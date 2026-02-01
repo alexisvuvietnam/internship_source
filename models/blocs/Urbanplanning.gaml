@@ -158,7 +158,7 @@ species urbanplanning parent: bloc {
 	action calculate_minicities_demand{
 		loop mini_ville over: mini_cities{
 		    loop i over: individual_consumption_U.keys {
-				mini_ville.demand[i] <- mini_ville.pop * individual_consumption_U[i] + 20000;
+				mini_ville.demand[i] <- mini_ville.pop * individual_consumption_U[i];
 				mini_ville.shortage[i] <- mini_ville.demand[i] - mini_ville.building_supply[i];
 		    }
 		    mini_ville.demand["school"] <- mini_ville.go_to_school/500.0 + 1;
