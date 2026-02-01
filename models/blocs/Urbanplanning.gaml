@@ -279,6 +279,9 @@ species urbanplanning parent: bloc {
 				// needs (resources consumed/emitted) for this demand
 				loop u over: production_inputs_U {
 					float quantity_needed <- production_output_inputs_U[c][u] * mini_ville.shortage[c]; // quantify the resources consumed/emitted by this demand
+					
+					// On consome des matériaux au fil du temps
+					quantity_needed <- quantity_needed/time_cost_U[c];
 
 					// Gestion cout d'entretient
 					if (supply_upkeep_U.keys contains c) {
