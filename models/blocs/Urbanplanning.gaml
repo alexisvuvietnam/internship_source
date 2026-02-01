@@ -162,7 +162,7 @@ species urbanplanning parent: bloc {
 				mini_ville.shortage[i] <- mini_ville.demand[i] - mini_ville.building_supply[i];
 		    }
 		    mini_ville.demand["school"] <- mini_ville.go_to_school/500.0 + 1;
-		    mini_ville.shortage["school"] <- mini_ville.demand["school"] - mini_ville.building_supply["school"];
+		    mini_ville.shortage["school"] <- max(0,mini_ville.demand["school"] - mini_ville.building_supply["school"]);
 		}
 	}
 	
