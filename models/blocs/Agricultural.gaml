@@ -538,6 +538,25 @@ species agricultural parent: bloc {
 
 }
 
+		}
+
+		action reset_tick_counters {
+			loop c over: consumed.keys { // reset choices counters
+				consumed[c] <- 0;
+			}
+
+		}
+
+		action consume (human h) {
+			loop c over: indivudual_consumption_A.keys {
+				consumed[c] <- consumed[c] + indivudual_consumption_A[c];
+			}
+
+		}
+
+	}
+
+}
 
 /* ----- FARM agent for micro model ----- */
 species farm {
