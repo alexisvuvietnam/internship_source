@@ -41,6 +41,9 @@ global {
 	list<map<string, float>> production_history_U <- [];
 	
 	list<mini_city> mini_cities <- [];
+	
+	int go_to_school <- 0;
+	int go_to_work <- 0;
 
 	init { // a security added to avoid launching an experiment without the other blocs
 		if (length(coordinator) = 0) {
@@ -165,7 +168,7 @@ species urbanplanning parent: bloc {
 	
 	action check_building_queue{
 		loop mini_ville over: mini_cities{
-		    list<string> finished_projects <- mini_ville.building_queue.keys where (int(mini_ville.building_queue[each][2]) <= cycle);
+		    list<string> finished_projects <- mini_ville.building_queue.keys() where (int(mini_ville.building_queue[each][2]) <= cycle);
 			loop b over: finished_projects{
 				list data <- mini_ville.building_queue[b];
 		        string b_name <- string(data[0]);
