@@ -19,8 +19,8 @@ global {
 	list<string> production_perishables_A <- ["kg_meat", "kg_vegetables"];
 	
 	int pop_size <- 10000;	// number of agents
-	int prop_human <- 7000;		// number of human an agent represents
-	int tick_counter <- 3; // track month, we start in spring
+	int prop_human <- round(7 * 1e7 / pop_size);		// number of human an agent represents
+	int tick_counter <- 3; // track mont)h, we start in spring
 	//float total_surface_used_A <- 0.0;
 	
 	/* Gibiers par mois moyenne : 13442208.3kg (9,8%) */
@@ -76,7 +76,8 @@ global {
 	map<string, float> tick_emissions_A <- [];
 	map<string, float> products_stock_A <- []; //"kg_meat"::0.0, "kg_vegetables"::0.0, "kg_cotton"::0.0
 	map<string, float> tick_waste_A <- [];
-	int nb_farms_A <- 0;
+	int total_num_farms_A <- 0;
+	float total_farms_surface_A <- 0.0;
 
 	init { // a security added to avoid launching an experiment without the other blocs
 		if (length(coordinator) = 0) {
@@ -104,6 +105,7 @@ species agricultural parent: bloc {
 	/* ----- MICRO VAR ----- */
 	list<farm> farms_list;
 	float total_farms_surface <- 0.0;
+	int total_num_farms <- 0;
 	float max_farm_surface_m2 <- 35.0 * 1e4; //taille moyenne en france 70 ha 2020
 	float min_farm_surface_m2 <- 5.0 * 1e4;
 	
@@ -178,6 +180,10 @@ species agricultural parent: bloc {
 	float get_total_farms_surface {
     	return total_farms_surface;
     }
+    
+    int get_total_num_farms {
+    	return total_num_farms;
+    }
 
 	action collect_last_tick_data {
 		if (cycle > 0) { // skip it the first tick
@@ -187,6 +193,9 @@ species agricultural parent: bloc {
 			tick_emissions_A <- producer.get_tick_emissions(); // collect emissions
 			products_stock_A <- producer.get_products_stock(); // collect stock
 			tick_waste_A <- producer.get_tick_waste();
+			
+			total_farms_surface_A <- total_farms_surface;
+			total_num_farms_A <- total_num_farms;
 			
 			
 			ask agri_consumer { // prepare new tick on consumer side
@@ -350,9 +359,13 @@ species agricultural parent: bloc {
             farms_list <- farms_list + created_farms;
         }
         
+        total_num_farms <- length(farms_list);
+        
         write "Farms created: " + nb_meat_farms + " meat, " + nb_veg_farms + " vegetables, " + nb_cotton_farms + " cotton, "+ nb_mixed_farms + " mixed";
-        write "Total farms: " + length(farms_list);
+        write "Total farms: " + total_num_farms;
     }
+    
+    
     
 
 	/**
@@ -646,6 +659,9 @@ species farm {
  */
 experiment run_agricultural type: gui {
 	output {
+		monitor "Total number of farms" value: world.total_num_farms_A;
+		monitor "Total surface used by farms (m2)" value: world.total_farms_surface_A;
+		
 		display Products_information {
 			chart "Meat - Consumption vs. Production" type: series size: {0.5, 0.5} position: {0, 0} {
 				data "Consumption" value: tick_pop_consumption_A["kg_meat"] color:#violet;
