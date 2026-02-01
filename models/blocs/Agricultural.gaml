@@ -112,6 +112,9 @@ species agricultural parent: bloc {
     float veg_farm_ratio <- 0.35;
     float mixed_farm_ratio <- 0.2;
     float cotton_farm_ratio <- 0.2;
+    
+    /* Shortage tracking (0 = no shortage; 1 = complete shortage) */
+    map<string, float> food_shortage <- ["kg_meat"::0.0, "kg_vegetables"::0.0];
 
 	action setup {
 		list<agri_producer> producers <- [];
@@ -179,6 +182,10 @@ species agricultural parent: bloc {
     	return total_farms_surface;
     }
 
+    map<string, float> get_food_shortage {
+    	return food_shortage;
+    }
+
 	action collect_last_tick_data {
 		if (cycle > 0) { // skip it the first tick
 			tick_pop_consumption_A <- consumer.get_tick_consumption(); // collect consumption behaviors
@@ -207,6 +214,16 @@ species agricultural parent: bloc {
 	
 	/* Modelises the production and consumption of products by the population */
 	action population_activity (list<human> pop) {
+
+		loop product over: food_shortage.keys {
+			food_shortage[product] <- 0.0;
+		}
+
+		ask pop {
+			additional_attributes["shortage_mortality_coeff"] <- "1.0";
+		}
+
+		
 		ask pop { // execute the consumption behavior of the population
 			ask myself.agri_consumer {
 				do consume(myself); // individuals consume agricultural goods
@@ -217,21 +234,50 @@ species agricultural parent: bloc {
 		
 			float total_meat_demand <- consumed["kg_meat"];
             float remaining_meat_demand <- max(0, total_meat_demand - kg_gibier_monthly);
+            
+            agricultural agri_ref <- myself;
+            float max_mortality_coef <- 1.0;
                         
 			ask agri_producer {
                 bool ok;
                 loop c over: myself.consumed.keys {
+                	float demand_qty;
                 	if (c = "kg_meat"){
+                		demand_qty <- remaining_meat_demand;
                 		ok <- produce(["kg_meat"::remaining_meat_demand]);
                 	} else {
+                		demand_qty <- myself.consumed[c];
                 		ok <- produce([c::myself.consumed[c]]);
                 	}
                 	
             		if not ok {
-            			write "Pénurie de " + c + " , stock est " + round(100 * products_stock[c]/myself.consumed[c]) + "% de demande totale.";
+            			//write "Pénurie de " + c + " , stock est " + round(100 * products_stock[c]/myself.consumed[c]) + "% de demande totale.";
+            			
+            			float shortage_coef <- 0.0;
+            			if (demand_qty > 0) {
+            				if (products_stock[c] <= 0) {
+            					shortage_coef <- 1.0;
+            				} else if (products_stock[c] < demand_qty) {
+            					shortage_coef <- (demand_qty - products_stock[c]) / demand_qty;
+            				}
+            			}
+            			
+            			agri_ref.food_shortage[c] <- shortage_coef;
+            			
+            			// Calcul new coeff (*5 to check)
+            			if (shortage_coef > 0) {
+            				float mortality_coef <- 1.0 + shortage_coef*5;
+            				max_mortality_coef <- max([max_mortality_coef, mortality_coef]);
+            			}
             		}
                 }
 
+			}
+			// Apply coeff to humans
+			if (max_mortality_coef > 1.0) {
+				ask pop {
+					additional_attributes["shortage_mortality_coeff"] <- string(max_mortality_coef);
+				}
 			}
 
 		}
@@ -464,7 +510,7 @@ species agricultural parent: bloc {
 							if not available {
 								// TODO implement partial availability (penurie case)
 								quota_received <- 0.0;
-								write "PRODUCTION : Farm " + name + " " + farm_type + " cannot get " + ressource + " for " + product;
+								//write "PRODUCTION : Farm " + name + " " + farm_type + " cannot get " + ressource + " for " + product;
 							} else {
 								myself.tick_resources_used[ressource] <- myself.tick_resources_used[ressource] + qty_needed;
 							}
