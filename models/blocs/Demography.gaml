@@ -202,8 +202,8 @@ species mini_city_demography parent: mini_city {
 	string male_gender;
 	int males <- 0;
 	int females <- 0;
-	int go_to_school <- put_category(18);
-	int go_to_work <- put_category(67);
+	int go_to_school <- 0;
+	int go_to_work <- 0;
 	
 	// age distribution: map from age category to count
 	map<int, int> age_distribution <- [];
@@ -262,6 +262,9 @@ species mini_city_demography parent: mini_city {
 	            age_distribution[age_cat] <- age_distribution[age_cat] + count;
 	        }
 	    }
+	    
+	    go_to_school <- put_category(18);
+	    go_to_work <- put_category(67);
 	    
 	}
 
@@ -388,6 +391,8 @@ species mini_city_demography parent: mini_city {
 		// Update distributions
 		age_distribution <- new_age_distribution;
 		gender_age_distribution <- new_gender_age_distribution;
+	    go_to_school <- put_category(18);
+	    go_to_work <- put_category(67);
 	}
 	
 	int put_category(int age_category){
