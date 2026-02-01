@@ -451,12 +451,12 @@ species agricultural parent: bloc {
 		
 		action produce_from_farms (list<farm> farm_list) {
 			ask farms_list {
-				map<string, map<string, float>> ressources_needed <- get_product_ressources_needed();
+				map<string, map<string, float>> resources_needed <- get_product_resources_needed();
 				float quota_received <- 1.0; //assumption for the moment that is 100% met or nothing
 				
-				loop product over: ressources_needed.keys {
-					loop ressource over: ressources_needed[product].keys {
-						float qty_needed <- ressources_needed[product][ressource];
+				loop product over: resources_needed.keys {
+					loop ressource over: resources_needed[product].keys {
+						float qty_needed <- resources_needed[product][ressource];
 						
 						if (myself.external_producers.keys contains ressource) {
 							bool available <- myself.external_producers[ressource].producer.produce([ressource::qty_needed]);
@@ -549,14 +549,14 @@ species farm {
 	// TODO supplying_cities list of cities being supplied by the farm in a way that they are not too far form each other
 	
 	map<string, float> production_capacity; //kg par tick tenant en compte la surface de l'exploitation
-	map<string, map<string, float>> product_ressources_needed; //produit, (ressource, quantité)
+	map<string, map<string, float>> product_resources_needed; //produit, (ressource, quantité)
 	
 	map<string, float> produced <- []; //type de produit, quantité
 	map<string, float> emissions <- []; // type of emission, its qty
 	
 	init {
 		do compute_capacity;
-		do compute_product_ressources_needed;
+		do compute_product_resources_needed;
 	}
 	
 	/* ---- Méthodes ---- */
@@ -582,24 +582,24 @@ species farm {
 	      
 	}
 	
-	action compute_product_ressources_needed {
+	action compute_product_resources_needed {
 		if empty(production_capacity) {
 			write "Production capacity of the farm has not been computed";
 		}
 		
-		product_ressources_needed <-[];
+		product_resources_needed <-[];
 		
 		loop product over: production_capacity.keys {
 			map<string, float> inputs_needed <- [];
 			inputs_needed["L water"] <- production_output_inputs_A[product]["L water"] * production_capacity[product];
 			inputs_needed["kWh energy"] <- production_output_inputs_A[product]["kWh energy"] * production_capacity[product]; //TODO check the name of input with energy bloc
-			product_ressources_needed[product] <- inputs_needed;
+			product_resources_needed[product] <- inputs_needed;
 		}
 	}
 	
-	/* Calculates products produced (proportionate to ressources given) and the corresponding emissions.
-	 * params quota_ressources : % of ressources needed that have been given (cas pénuries) */
-	action farm_produce(float quota_ressources) {		
+	/* Calculates products produced (proportionate to resources given) and the corresponding emissions.
+	 * params quota_resources : % of resources needed that have been given (cas pénuries) */
+	action farm_produce(float quota_resources) {		
 		produced <- [];
 		emissions <- ["gCO2e emissions"::0.0];
 	
@@ -609,11 +609,11 @@ species farm {
 			float season_factor <- season_multipliers[product][month];
 			float climate_factor <- rnd(climate_min, climate_max);
 			float qty;
-			if quota_ressources = nil {
+			if quota_resources = nil {
 				qty <- production_capacity[product] * season_factor * climate_factor;
 			} 
 			else {
-				qty <- production_capacity[product] * season_factor * climate_factor * quota_ressources;
+				qty <- production_capacity[product] * season_factor * climate_factor * quota_resources;
 				
 			}
 			produced[product] <- qty;
@@ -623,8 +623,8 @@ species farm {
 		
 	}
 	
-	map<string, map<string, float>> get_product_ressources_needed {
-		return product_ressources_needed;
+	map<string, map<string, float>> get_product_resources_needed {
+		return product_resources_needed;
 	}
 	
 	map<string, float> get_produced {
