@@ -22,9 +22,9 @@ global {
 	
 	/* Production data */
 	// TODO : adapter les production et le cout de celle ci sur les bonnes
-	map<string, map<string, float>> production_output_inputs_U <- ["modular_house_lobby"::["m3_wood"::0.0, "kg_plastic"::129100.0], "modular_house_extension"::["m3_wood"::0.0, "kg_plastic"::38323.0], "wooden_building"::["m3_wood"::624.0, "kg_plastic"::0.0], "plastic_factory"::["m3_wood"::184000.0, "kg_plastic"::42000000.0], "kg_plastic"::["kg_coton"::16.5, "kWh energy"::6.0], "centre_loisir"::["m3_wood"::1807.0, "kg_plastic"::451902.0], "kg_plastic"::["kg_coton"::16.5, "kWh energy"::6.0], "school"::["kg_plastic"::0.0, "m3_wood"::10000.0]]; //temporary value for school
+	map<string, map<string, float>> production_output_inputs_U <- ["modular_house_lobby"::["m3_wood"::0.0, "kg_plastic"::129100.0], "modular_house_extension"::["m3_wood"::0.0, "kg_plastic"::38323.0], "wooden_building"::["m3_wood"::624.0, "kg_plastic"::0.0], "plastic_factory"::["m3_wood"::184000.0, "kg_plastic"::42000000.0], "kg_plastic"::["kg_coton"::16.5, "kWh energy"::6.0], "centre_loisir"::["m3_wood"::1807.0, "kg_plastic"::451902.0], "kg_plastic"::["kg_coton"::16.5, "kWh energy"::6.0], "school"::["kg_plastic"::0.0, "m3_wood"::10000.0]];//temporary value for school
 	map<string, map<string, float>> production_output_emissions_U <- ["modular_house_lobby"::["gCO2e emissions"::1000000.0], "modular_house_extension"::["gCO2e emissions"::30000.0], "wooden_building"::["gCO2e emissions"::300000.0], "plastic_factory"::["gCO2e emissions"::50000000.0],"centre_loisir"::["gCO2e emissions"::10000.0] ,"kg_plastic"::["gCO2e emissions"::0.0], "school"::["gCO2e emissions"::1280000000.0]]; //temporary value for school
-	map<string, map<string, float>>	supply_upkeep_U <- ["modular_house_lobby"::["m² land"::0.0, "kg_plastic"::1291.0/12.0], "modular_house_extension"::["m² land"::50.0, "m3_wood"::0.0, "kg_plastic"::383.23/12.0], "wooden_building"::["m² land"::100.0, "m3_wood"::6.24/12.0, "kg_plastic"::0.0], "plastic_factory"::["m² land"::1000000.0], "centre_loisir"::["m3_wood"::18.07, "kg_plastic"::4519.02, "m² land"::1200], "school"::["m² land"::5000.0, "kg_plastic"::0.0, "m3_wood"::257.0/(12.0*15.0)]]; //temporary value for school
+	map<string, map<string, float>>	supply_upkeep_U <- ["modular_house_lobby"::["m² land"::0.0, "kg_plastic"::1291.0/12.0], "modular_house_extension"::["m² land"::50.0, "m3_wood"::0.0, "kg_plastic"::383.23/12.0], "wooden_building"::["m² land"::100.0, "m3_wood"::6.24/12.0, "kg_plastic"::0.0], "plastic_factory"::["m² land"::1000000.0], "centre_loisir"::["m3_wood"::18.07, "kg_plastic"::4519.02, "m² land"::1200], "school"::["m² land"::5000.0, "kg_plastic"::0.0, "m3_wood"::257.0/(12.0*15.0)]];//temporary value for school
 	float factory_production_capacity <- 11000000.0;
 	map<string, float> individual_consumption_U <- ["modular_house_extension"::1.0*(1-wooden_building_ratio), "modular_house_lobby"::0.05*(1-wooden_building_ratio), "wooden_building"::0.0208*wooden_building_ratio, "centre_loisir"::0.0001];
 	
@@ -84,6 +84,8 @@ species urbanplanning parent: bloc {
 		        c.building_supply[i] <- (c.pop * individual_consumption_U[i])/2.0;
 		        c.potential_building_supply[i] <- c.building_supply[i];
 		    }
+		    c.building_supply["school"] <- c.go_to_school/500.0;
+		    c.potential_building_supply["school"] <- c.building_supply["school"];
 		}
 		
 		loop c over: mini_cities {
@@ -162,6 +164,8 @@ species urbanplanning parent: bloc {
 				mini_ville.demand[i] <- mini_ville.pop * individual_consumption_U[i];
 				mini_ville.shortage[i] <- mini_ville.demand[i] - mini_ville.building_supply[i];
 		    }
+		    mini_ville.demand["school"] <- mini_ville.go_to_school/500.0;
+		    mini_ville.shortage["school"] <- mini_ville.demand["school"] - mini_ville.building_supply["school"];
 		}
 	}
 	
