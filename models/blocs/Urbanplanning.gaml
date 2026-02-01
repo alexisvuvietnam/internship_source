@@ -16,7 +16,7 @@ global {
 	
 	// TODO : adapter les productions et les ressources demandées sur les vrais variables et valeurs
 	list<string> production_inputs_U <- ["m3_wood", "kWh energy", "kg_coton", "m² land"];
-	list<string> production_outputs_U <- ["modular_house_lobby", "modular_house_extension", "wooden_building", "plastic_factory", "centre_loisir"];
+	list<string> production_outputs_U <- ["modular_house_lobby", "modular_house_extension", "wooden_building", "plastic_factory", "centre_loisir", "school"];
 	list<string> autoproduction_U <- ["kg_plastic"];
 	list<string> production_emissions_U <- ["gCO2e emissions"];
 	
