@@ -16,10 +16,12 @@ global {
 	list<string> production_outputs_A <- ["kg_meat", "kg_vegetables", "kg_cotton"];
 	list<string> production_inputs_A <- ["L water", "kWh energy", "m² land"];
 	list<string> production_emissions_A <- ["gCO2e emissions"];
+	list<string> production_perishables_A <- ["kg_meat", "kg_vegetables"];
+	
 	int pop_size <- 10000;	// number of agents
 	int prop_human <- 7000;		// number of human an agent represents
-	int tick_counter <- 0; // track month 
-	float total_surface_used_A <- 0.0;
+	int tick_counter <- 3; // track month, we start in spring
+	//float total_surface_used_A <- 0.0;
 	
 	/* Gibiers par mois moyenne : 13442208.3kg (9,8%) */
 	float kg_sanglier <- 900000 * 150.0 / 12; // Un sanglier européen pèse environ 150 kg
@@ -72,9 +74,9 @@ global {
 	map<string, float> tick_pop_consumption_A <- [];
 	map<string, float> tick_resources_used_A <- [];
 	map<string, float> tick_emissions_A <- [];
-	//float stock_veg_A <- 0.0;
-	//float stock_meat_A <- 0.0;
-	map<string, float> products_stock_A <- ["kg_meat"::0.0, "kg_vegetables"::0.0, "kg_cotton"::0.0];
+	map<string, float> products_stock_A <- []; //"kg_meat"::0.0, "kg_vegetables"::0.0, "kg_cotton"::0.0
+	map<string, float> tick_waste_A <- [];
+	int nb_farms_A <- 0;
 
 	init { // a security added to avoid launching an experiment without the other blocs
 		if (length(coordinator) = 0) {
@@ -86,6 +88,8 @@ global {
 	}
 
 }
+
+
 
 /**
  * We define here the agricultural bloc as a species.
@@ -118,15 +122,22 @@ species agricultural parent: bloc {
 		consumer <- first(consumers);
 	}
 
+	/* Actions order in each tick
+	 * - Collect data & reset for next tick
+	 * - Production
+	 * - Compute perishing products in stock
+	 * - Consumption
+	 * extra : update tick counter
+	 */
 	action tick (list<human> pop) {
 		do collect_last_tick_data();
 		
-		do population_activity(pop);
-		
 		ask agri_producer {
-			//do produce_from_land;
 			do produce_from_farms(myself.farms_list);
+			do apply_perishing();
 		}
+		
+		do population_activity(pop);
 		
 		if (tick_counter = 11) {
 			tick_counter <- 0;
@@ -175,18 +186,8 @@ species agricultural parent: bloc {
 			tick_production_A <- producer.get_tick_outputs_produced(); // collect production
 			tick_emissions_A <- producer.get_tick_emissions(); // collect emissions
 			products_stock_A <- producer.get_products_stock(); // collect stock
-			//stock_veg_A <- producer.get_stock_veg(); // collect vegetables stock
-			//surface_veg_A <- producer.get_surface_veg();
-			//surface_meat_A <- producer.get_surface_meat();
+			tick_waste_A <- producer.get_tick_waste();
 			
-			// Produce from land using surface allocated in previous tick
-			// This must be called BEFORE reset_tick_counters to use the accumulated surface
-			
-			
-			// Collect production AFTER produce_from_land updates it, BEFORE reset
-			//tick_production_A <- producer.get_tick_outputs_produced();
-			//write "Collect last tick data, emissions ** " + tick_emissions_A ;
-			//write "Collect last tick data, production ** " + tick_production_A ;
 			
 			ask agri_consumer { // prepare new tick on consumer side
 				do reset_tick_counters;
@@ -206,7 +207,6 @@ species agricultural parent: bloc {
 	
 	/* Modelises the production and consumption of products by the population */
 	action population_activity (list<human> pop) {
-		//write "Pop_size " + length(pop);
 		ask pop { // execute the consumption behavior of the population
 			ask myself.agri_consumer {
 				do consume(myself); // individuals consume agricultural goods
@@ -214,45 +214,16 @@ species agricultural parent: bloc {
 		}
 
 		ask agri_consumer { // produce the required quantities
+		
 			float total_meat_demand <- consumed["kg_meat"];
             float remaining_meat_demand <- max(0, total_meat_demand - kg_gibier_monthly);
-            
-            //write "Demand MEAT from population (minus gibier supply) " + remaining_meat_demand;
-            
+                        
 			ask agri_producer {
-				/*loop c over: myself.consumed.keys {
-					bool ok <- produce([c::myself.consumed[c]]); // send the demands to the producer
-					if ok {
-						float quantity_consumed <- myself.consumed[c];
-						if (c = "kg_meat") {
-							stock_meat <- stock_meat - quantity_consumed;
-						} else if (c = "kg_vegetables") {
-							stock_veg <- stock_veg - quantity_consumed;
-						}
-
-					}
-
-				}*/
-				// consumption of gibier first
-				/*if (remaining_meat_demand > 0) {
-                    bool ok <- produce(["kg_meat"::remaining_meat_demand]);
-                    if ok {
-                        stock_meat <- stock_meat - remaining_meat_demand;
-                    }
-                }
-                
-                if (myself.consumed["kg_vegetables"] > 0) {
-                    bool ok <- produce(["kg_vegetables"::myself.consumed["kg_vegetables"]]);
-                    if ok {
-                        stock_veg <- stock_veg - myself.consumed["kg_vegetables"];
-                    }
-                }*/
                 bool ok;
                 loop c over: myself.consumed.keys {
                 	if (c = "kg_meat"){
                 		ok <- produce(["kg_meat"::remaining_meat_demand]);
                 	} else {
-                		//write "Produce what ? " + c;
                 		ok <- produce([c::myself.consumed[c]]);
                 	}
                 	
@@ -271,6 +242,7 @@ species agricultural parent: bloc {
 	// ----- actions for init creation of farms -----
 	
 	action calculate_initial_farms {
+		write "Pop size used for init demand " + pop_size;
         float monthly_meat_demand_total <- individual_consumption_A["kg_meat"] * pop_size;
         float monthly_meat_demand_farms <- max(0, monthly_meat_demand_total - kg_gibier_monthly);
         float monthly_veg_demand <- individual_consumption_A["kg_vegetables"] * pop_size;
@@ -394,11 +366,13 @@ species agricultural parent: bloc {
 		map<string, float> tick_resources_used <- [];
 		map<string, float> tick_production <- [];
 		map<string, float> tick_emissions <- [];
-//		float stock_veg <- 0.0;
-//		float stock_meat <- 0.0;
-//		float surface_veg <- 0.0;
-//		float surface_meat <- 0.0;
-		map<string, float> products_stock <- ["kg_meat":: 1.4 * 1e8, "kg_vegetables"::1.0 * 1e8, "kg_cotton"::25000.0 * 1e3];
+		
+		/* Stock related */
+		map<string, float> tick_waste <- []; // product, qty of product that perishes -> eliminated from stock
+		map<string, float> products_stock <- ["kg_meat":: 1.4 * 1e8, "kg_vegetables"::2.0 * 1e9, "kg_cotton"::50000.0 * 1e3];
+		map<string, float> perish_rate <- ["kg_meat"::0.05, "kg_vegetables"::0.08]; //choix arbitraire
+		
+		
 		//map<string, float> surface_used <- ["kg_meat":: 0.0, "kg_vegetables"::0.0, "kg_cotton"::0.0];
 		
 
@@ -417,64 +391,21 @@ species agricultural parent: bloc {
 		map<string, float> get_tick_emissions {
 			return tick_emissions;
 		}
-
-		//float get_stock_veg {
-	    //    return products_stock["kg_vegetables"];
-	    //}
-	
-	    //float get_stock_meat {
-	    //    return products_stock["kg_meat"];
-	    //}
-	    
-	    //float get_stock_cotton {
-	    //    return products_stock["kg_cotton"];
-	    //}
-
-		//float get_surface_veg {
-		//	return surface_veg;
-		//}
-
-		//float get_surface_meat {
-		//	return surface_meat;
-		//}
 		
 		map<string, float> get_products_stock {
 			return products_stock;
+		}
+		
+		map<string, float> get_tick_waste {
+			return tick_waste;
 		}
 
 		action set_supplier (string product, bloc bloc_agent) {
 			write name + ": external producer " + bloc_agent + " set for " + product;
 			external_producers[product] <- bloc_agent;
 		}
-		
-		// Calculate monthly production based on allocated surface and seasonal/climate factors
-		/*action produce_from_land{
-			loop c over: production_outputs_A{
-				float surface <- 0.0;
-				if (c = "kg_meat") {
-					surface <- surface_meat;
-				} else if (c = "kg_vegetables") {
-					surface <- surface_veg;
-				}
 
-				// Calculate actual yield with seasonal factors and climate variability
-				if (c = "kg_meat" or c = "kg_vegetables"){
-					float actual_production <- calculate_yield(c, surface);
-				
-				
-					// Add production to stock
-					if (c = "kg_meat") {
-						stock_meat <- stock_meat + actual_production;
-					} else if (c = "kg_vegetables") {
-						stock_veg <- stock_veg + actual_production;
-					}
-	
-					tick_production[c] <- tick_production[c] + actual_production;
-				}
-			}
 
-		}*/
-		
 
 		action reset_tick_counters { // reset impact counters
 			loop u over: production_inputs_A {
@@ -488,105 +419,32 @@ species agricultural parent: bloc {
 			loop e over: production_emissions_A {
 				tick_emissions[e] <- 0.0;
 			}
-			/*surface_veg <- 0.0;
-			surface_meat <- 0.0;*/
+			loop p over: production_perishables_A{
+				tick_waste[p] <- 0.0;
+			}
 		}
 
-		/* calculate yield of a land takes into account the month and a random climate factor to represent dry or flood */
-		float calculate_yield (string product_type, float surface_m2) {
-			float yield <- kg_per_m2[product_type];
-			int month <- tick_counter;
-			write "Agri : month : "+ month;
-			float season_factor <- season_multipliers[product_type][month];
-			float climate_factor <- rnd(climate_min, climate_max);
-			float total_yield <- surface_m2 * yield * season_factor * climate_factor;
-			return total_yield;
-		}
-
-//		bool produce (map<string, float> demand) {
-//			bool ok <- true;
-//			bool ok_surface <- true;
-//			loop c over: demand.keys {
-//				loop u over: production_inputs_A {
-//					float quantity_needed <- production_output_inputs_A[c][u] * demand[c]; // quantify the resources consumed/emitted by this demand
-//					tick_resources_used[u] <- tick_resources_used[u] + quantity_needed;
-//					if (external_producers.keys contains u) { // if there is a known external producer for this product/good
-//						bool av <- external_producers[u].producer.produce([u::quantity_needed]); // ask the external producer to product the required quantity
-//						if (u = "m² land") {
-//							if av {
-//								if (c = "kg_vegetables") {
-//									surface_veg <- surface_veg + quantity_needed;
-//								} else if (c = "kg_meat") {
-//									surface_meat <- surface_meat + quantity_needed;
-//								}
-//
-//							} else {
-//								ok_surface <- false;
-//							}
-//
-//						} else {
-//							if not av {
-//								ok <- false;
-//								write "Ressource " + u + " refusé, quantité demandé : " + quantity_needed;
-//							}
-//
-//						}
-//
-//					} else {
-//					//write "not exist u = " + u;
-//					}
-//					// every year we ask surface_needed
-//
-//					/*if (tick_counter=0){
-//						if (external_producers.keys contains u){
-//							bool av <- external_producers["m² land"].producer.produce(["m² land"::surface_veg+surface_meat]);
-//							if not av{
-//								ok_surface <- false;
-//							}else{
-//								float surface_veg <- surface_veg + indivudual_consumption_A["kg_vegetables"]*production_output_inputs_A["kg_vegetables"]["m² land"];
-//								float surface_meat <- surface_meat + indivudual_consumption_A["kg_meat"]*production_output_inputs_A["kg_meat"]["m² land"];
-//							}
-//						
-//						}
-//					}*/
-//				}
-//
-//				loop e over: production_emissions_A { // apply emissions
-//					float quantity_emitted <- production_output_emissions_A[c][e] * demand[c];
-//					tick_emissions[e] <- tick_emissions[e] + quantity_emitted;
-//				}
-//
-//				/*if ok {
-//					if (c = "kg_meat") {
-//						stock_meat <- stock_meat + demand[c];
-//					}
-//
-//					if (c = "kg_vegetables") {
-//						stock_veg <- stock_veg + demand[c];
-//					}
-//
-//				}*/
-//
-//				tick_production[c] <- tick_production[c] + demand[c];
-//			}
-//
-//			return ok;
+//		/* calculate yield of a land takes into account the month and a random climate factor to represent dry or flood */
+//		float calculate_yield (string product_type, float surface_m2) {
+//			float yield <- kg_per_m2[product_type];
+//			int month <- tick_counter;
+//			write "Agri : month : "+ month;
+//			float season_factor <- season_multipliers[product_type][month];
+//			float climate_factor <- rnd(climate_min, climate_max);
+//			float total_yield <- surface_m2 * yield * season_factor * climate_factor;
+//			return total_yield;
 //		}
 		
 		/* Checks if we are answering the demand with our stocks (also contains production of the tick) */
 		bool produce(map<string, float> demand) {
 			bool ok <- true;
-			//write "** Action produce - before demand, meat_stock " + products_stock["kg_meat"];
 			loop c over: demand.keys {
-				//write " What is c from demand.keys ? " + c + " And how much ? " + demand[c];
 				if (products_stock[c] >= demand[c]) {
-					//write " ----- HELLO ----";
 					products_stock[c] <- products_stock[c] - demand[c];
 				} else {
 					ok <- false;
 				}
 			}
-			//write "** Action produce - after demand, meat_stock " + products_stock["kg_meat"];
 			
 			return ok;
 		}
@@ -606,7 +464,7 @@ species agricultural parent: bloc {
 							if not available {
 								// TODO implement partial availability (penurie case)
 								quota_received <- 0.0;
-								write "Farm cannot get " + ressource + " for " + product;
+								write "PRODUCTION : Farm " + name + " " + farm_type + " cannot get " + ressource + " for " + product;
 							} else {
 								myself.tick_resources_used[ressource] <- myself.tick_resources_used[ressource] + qty_needed;
 							}
@@ -617,12 +475,11 @@ species agricultural parent: bloc {
 				do farm_produce(quota_received);
 				
 				map<string, float> farm_production <- get_produced();
-				//write "farm_produce " + name + get_produced();
+
 				loop product over: farm_production.keys {
 					myself.tick_production[product] <- myself.tick_production[product] + farm_production[product];
 					myself.products_stock[product] <- myself.products_stock[product] + farm_production[product];
 				}
-				//write "produce_from_farms VEG ** " + myself.tick_production["kg_vegetables"];
 				
 				map<string, float> farm_emissions <- get_emissions();
 				loop e over: farm_emissions.keys {
@@ -631,6 +488,14 @@ species agricultural parent: bloc {
 				myself.tick_resources_used["m² land"] <- myself.tick_resources_used["m² land"] + surface_m2;
 			}
 			
+		}
+		
+		/* Applies  */
+		action apply_perishing {
+			loop p over: production_perishables_A {
+				tick_waste[p] <- products_stock[p] * perish_rate[p];
+				products_stock[p] <- products_stock[p] - tick_waste[p];
+			}
 		}
 
 	}
@@ -711,8 +576,8 @@ species farm {
 		}
 	
 		if (farm_type = "mixed") {
-			production_capacity["kg_meat"] <- surface_m2 * 0.5;
-			production_capacity["kg_vegetables"] <- surface_m2 * 0.5;
+			production_capacity["kg_meat"] <- surface_m2 * 0.3;
+			production_capacity["kg_vegetables"] <- surface_m2 * 0.7;
 		}
 	      
 	}
@@ -732,7 +597,7 @@ species farm {
 		}
 	}
 	
-	/* Calculates products produced and the corresponding emissions.
+	/* Calculates products produced (proportionate to ressources given) and the corresponding emissions.
 	 * params quota_ressources : % of ressources needed that have been given (cas pénuries) */
 	action farm_produce(float quota_ressources) {		
 		produced <- [];
@@ -781,51 +646,53 @@ species farm {
  */
 experiment run_agricultural type: gui {
 	output {
-		display Agricultural_information {
-			chart "Stock levels" type: series size: {0.5, 0.5} position: {0, 0}{
-//				loop s over: products_stock_A.keys {
-//					data s value: products_stock_A[s];
-//				}
-				data "kg_meat" value: products_stock_A["kg_meat"];
-				data "dg_vegetables (10 kg)" value: products_stock_A["kg_vegetables"]/10 ;
-				data "kg_cotton" value: products_stock_A["kg_cotton"];
+		display Products_information {
+			chart "Meat - Consumption vs. Production" type: series size: {0.5, 0.5} position: {0, 0} {
+				data "Consumption" value: tick_pop_consumption_A["kg_meat"] color:#violet;
+				data "Production" value: tick_production_A["kg_meat"] color:#turquoise;
 			}
 
-			chart "Total production" type: series size: {0.5, 0.5} position: {0.5, 0} {
-				loop c over: production_outputs_A {
-					data c value: tick_production_A[c];
-				}
+			chart "Vegetables - Consumption vs. Production" type: series size: {0.5, 0.5} position: {0.5, 0} {
+				data "Consumption" value: tick_pop_consumption_A["kg_vegetables"] color:#violet;
+				data "Production" value: tick_production_A["kg_vegetables"] color:#turquoise;
 
 			}
-
-			chart "Resources usage" type: series size: {0.5, 0.5} position: {0, 0.5} {
-				//loop r over: production_inputs_A {
-				//	data r value: tick_resources_used_A[r];
-				//}
-				data "kL water (1000 L)" value: tick_resources_used_A["L water"]/1000 ;
-				data "kWh energy" value: tick_resources_used_A["kWh energy"];
-				data "m² land" value: tick_resources_used_A["m² land"];
-
+			
+			chart "Cotton - Production" type: series size: {0.5, 0.5} position: {0, 0.5} {
+				data "Production" value: tick_production_A["kg_cotton"] color:#turquoise;
 			}
-
-			chart "Production emissions" type: series size: {0.5, 0.5} position: {0.5, 0.5} {
-				loop e over: production_emissions_A {
-					data e value: tick_emissions_A[e];
-				}
-
+			
+			chart "Stock evolution" type: series size: {0.5, 0.5} position: {0.5, 0.5} {
+				data "kg_meat" value: products_stock_A["kg_meat"] color:#red;
+				data "kg_vegetables" value: products_stock_A["kg_vegetables"] color:#blue;
+				data "kg_cotton" value: products_stock_A["kg_cotton"] color:#lime;
 			}
 
 		}
 
-		display Population_information {
-			chart "Population direct consumption" type: series size: {0.5, 0.5} position: {0.25, 0} {
-				data "kg_meat" value: tick_pop_consumption_A["kg_meat"];
-				data "kg_vegetables" value: tick_pop_consumption_A["kg_vegetables"];
+		display Other_information {
+			chart "Population size evolution" type: series size: {0.5, 0.5} position: {0, 0} {
+				data "pop_size" value: pop_size color:#magenta;
+			}
+			
+			chart "Resources usage" type: series size: {0.5, 0.5} position: {0.5, 0.5} {
+				data "kL water (1000 L)" value: tick_resources_used_A["L water"]/1000 color:#skyblue;
+				data "kWh energy" value: tick_resources_used_A["kWh energy"] color:#orange;
+				data "m² land" value: tick_resources_used_A["m² land"] color:#pink;
+
+			}
+
+			chart "Production emissions" type: series size: {0.5, 0.5} position: {0.5, 0} {
+				loop e over: production_emissions_A {
+					data e value: tick_emissions_A[e] color:#brown;
+				}
 
 			}
 			
-			chart "Population size evolution" type: series size: {0.5, 0.5} position: {0.25, 0.5} {
-				data "pop_size" value: pop_size;
+			chart "Waste generated of perishable goods" type: series size: {0.5, 0.5} position: {0, 0.5} {
+				loop w over: production_perishables_A {
+					data w value: tick_waste_A[w];
+				}
 			}
 			
 		}
