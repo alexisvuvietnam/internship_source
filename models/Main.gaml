@@ -19,7 +19,7 @@ import "blocs/Environnement.gaml"
  */
 global {
 // parameters for city generation
-	int population_size <- 10000; // number of people in the simulation
+	int population_size <- 1000000; // number of people in the simulation
 	int number_of_mini_cities <- 100; // number of mini-cities
 	int city_population <- 70000; // number of people per city (constellations of mini-cities)
 	bool use_gis <- true; // use GIS or not (needed to spatialise, instanciate territory species, and to display the map)
@@ -85,7 +85,6 @@ global {
 		// instanciate the blocs (E, A and R blocs here):
 		create residents number: 1 {
 			enabled <- enable_demography;
-			nb_init_individuals <- population_size;
 		}
 
 		create agricultural number: 1 {
@@ -170,39 +169,6 @@ experiment main_experiment type: gui {
 				data "Agriculture" value: world.tick_resources_used_A["L water"] color: #orange;
 				data "Énergie" value: world.tick_resources_used_E["L water"] color: #yellow;
 			}
-
-		}
-
-		display "Évolution de la consommation d'eau pour chaque secteur" type: 2d {
-			chart "Évolution de la consommation d'eau pour chaque secteur" type: series {
-				data "Agriculture" value: world.tick_resources_used_A["L water"] color: #orange;
-				data "Énergie" value: world.tick_resources_used_E["L water"] color: #yellow;
-			}
-
-		}
-
-		// Affichage des GES
-		display "Répartition de la production de GES pour chaque secteur" type: 2d {
-			chart "Quantité de GES émis pour chaque secteur (en grammes)" type: pie {
-				data "Agriculture" value: world.tick_emissions_A["gCO2e emissions"] color: #orange;
-				data "Urbanisme" value: world.tick_emissions_U["gCO2e emissions"] color: #gray;
-				data "Energie" value: world.tick_emissions_E["gCO2e emissions"] color: #yellow;
-			}
-
-		}
-
-		display "Évolution de l'émission de GES pour chaque secteur" type: 2d {
-			chart "Évolution de l'émission de GES pour chaque secteur (en grammes)" type: series {
-				data "Agriculture" value: world.tick_emissions_A["gCO2e emissions"] color: #orange;
-				data "Urbanisme" value: world.tick_emissions_U["gCO2e emissions"] color: #gray;
-				data "Energie" value: world.tick_emissions_E["gCO2e emissions"] color: #yellow;
-				data "Transport" value: world.tick_emissions_T["gCO2e emissions"] color: #blue;
-				data "Environnement" value: world.tick_absorbed_ECO["gCO2e emissions"] color: #green; // Ne s'affiche pas pour les données négatives
-				data "Total" value:
-				world.tick_emissions_A["gCO2e emissions"] + world.tick_emissions_U["gCO2e emissions"] + world.tick_emissions_E["gCO2e emissions"] + world.tick_emissions_T["gCO2e emissions"] + world.tick_absorbed_ECO["gCO2e emissions"]
-				color: #black;
-			}
-
 		}
 
 		display "Évolution de la consommation d'eau pour chaque secteur" type: 2d {

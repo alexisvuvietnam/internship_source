@@ -11,7 +11,7 @@ import "../API/API.gaml"
 global {
 /* Setup */
 // TODO : adapter les productions et les ressources demandées sur les vrais variables et valeurs
-	list<string> production_inputs_U <- ["m3_wood", "Wh energy", "kg_cotton", "m² land"];
+	list<string> production_inputs_U <- ["m3_wood", "kWh energy", "kg_coton", "m² land"];
 	list<string> production_outputs_U <- ["modular_house_lobby", "modular_house_extension", "wooden_building"];
 	list<string> autoproduction_U <- ["kg_plastic"];
 	list<string> production_emissions_U <- ["gCO2e emissions"];
@@ -19,7 +19,7 @@ global {
 	/* Production data */
 	// TODO : adapter les production et le cout de celle ci sur les bonnes
 	map<string, map<string, float>>
-	production_output_inputs_U <- ["modular_house_lobby"::["m3_wood"::0.0, "kg_plastic"::3000.0], "modular_house_extension"::["m3_wood"::0.0, "kg_plastic"::600.0], "wooden_building"::["m3_wood"::80.0, "kg_plastic"::0.0], "plastic_factory"::["m3_wood"::184000.0, "kg_plastic"::42000000.0], "kg_plastic"::["kg_cotton"::16.5, "Wh energy"::6.0]];
+	production_output_inputs_U <- ["modular_house_lobby"::["m3_wood"::0.0, "kg_plastic"::3000.0], "modular_house_extension"::["m3_wood"::0.0, "kg_plastic"::600.0], "wooden_building"::["m3_wood"::80.0, "kg_plastic"::0.0], "plastic_factory"::["m3_wood"::184000.0, "kg_plastic"::42000000.0], "kg_plastic"::["kg_coton"::16.5, "kWh energy"::6.0]];
 	map<string, map<string, float>>
 	production_output_emissions_U <- ["modular_house_lobby"::["gCO2e emissions"::1000000.0], "modular_house_extension"::["gCO2e emissions"::30000.0], "wooden_building"::["gCO2e emissions"::300000.0], "plastic_factory"::["gCO2e emissions"::50000000.0], "kg_plastic"::["gCO2e emissions"::0.0]];
 	map<string, map<string, float>>
@@ -203,11 +203,6 @@ species urbanplanning parent: bloc {
 		}
 
 		bool produce (map<string, float> demand) { // apply the input
-			
-			if(is_day_off){
-				return false;
-			}
-			
 			bool ok <- true;
 			list<map<string, float>> valeurs <- [];
 
@@ -367,7 +362,7 @@ experiment run_urban type: gui {
 
 	reflex {
 		loop i over: production_inputs_U {
-		/*if(not(i = "kg_cotton")){
+		/*if(not(i = "kg_coton")){
 				save [cycle, i, tick_resources_used_U[i]] to: "results_files/urbanplanning/urban_ressources.csv" rewrite: false;
 			}*/
 			save [cycle, i, tick_resources_used_U[i]] to: "results_files/urbanplanning/urban_ressources.csv" rewrite: false;

@@ -33,10 +33,13 @@ global {
 	float used_surface <- 0.0; // Surface utilisée par les autres secteurs
 
 	/* Production annuelle convertie en production mensuelle*/
-	float prod_wood <- 87800000 / 12;
+	float prod_wood <- 87800000 / 12; //environ 7 millions de m3
 	float prod_meat <- 900000 * 150.0 / 12; // Un sanglier européen pèse environ 150 kg
+	// Production d'eau par mois (recharge via précipitations et infiltration)
+	// Environ 440 milliards m3/an de précipitations, 20% utilisable = 88 milliards m3/an
+	float prod_water <- (88e12) / 12; // environ 7 300 milliards de litres par mois
 
-	/* GES absorbé par mois (en moyenne période 2007 à 2020 */
+	/* GES absorbé par mois (en moyenne période 2007 à 2020) */
 	float GES_absorbe_per_tick <- 8.3e10; // 83 000 tonnes par mois (ici en grammes)
 
 	/* Compteurs pour les données */
@@ -193,7 +196,7 @@ species environnement parent: bloc {
 			/* Émission de GES (absorbtion dans le cas de l'écosystème) */
 			// Ajout d'une petite variation epsilon arbitraire
 			//float eps <- 1.0;
-			tick_emissions["gCO2e emissions"] <- -GES_absorbe_per_tick;
+			tick_emissions["gCO2e emissions"] <- stock_wood * 4.2e3; //absorption de gCO2 d'un m3 d'arbre par mois
 			return true; // production réussie
 		}
 
