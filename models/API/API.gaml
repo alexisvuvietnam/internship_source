@@ -35,6 +35,13 @@ species bloc {
  * See the example blocs supplied alongside the API for more details.
  */
 species production_agent {
+	
+	float proba_vacation <- 0.33;//Approximately one over three days per years are day-off. 
+	bool is_day_off <- false;
+	
+	reflex go_to_work {
+		is_day_off <- flip(proba_vacation);
+	}
 
 /* Produce the given resources in the requested quantities. Return true in case of success. */
 	action produce (map<string, float> demand) virtual: true type: bool;
