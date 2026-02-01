@@ -10,6 +10,10 @@ import "../API/API.gaml"
 
 global {
 /* Setup */
+
+	// Config
+	float wooden_building_ratio <- 0.4;
+
 // TODO : adapter les productions et les ressources demandées sur les vrais variables et valeurs
 	list<string> production_inputs_U <- ["m3_wood", "kWh energy", "kg_coton", "m² land"];
 	list<string> production_outputs_U <- ["modular_house_lobby", "modular_house_extension", "wooden_building"];
@@ -21,9 +25,9 @@ global {
 	map<string, map<string, float>>
 	production_output_inputs_U <- ["modular_house_lobby"::["m3_wood"::0.0, "kg_plastic"::129100.0], "modular_house_extension"::["m3_wood"::0.0, "kg_plastic"::38323.0], "wooden_building"::["m3_wood"::624.0, "kg_plastic"::0.0], "plastic_factory"::["m3_wood"::184000.0, "kg_plastic"::42000000.0], "kg_plastic"::["kg_coton"::16.5, "kWh energy"::6.0]];
 	map<string, map<string, float>> production_output_emissions_U <- ["modular_house_lobby"::["gCO2e emissions"::1000000.0], "modular_house_extension"::["gCO2e emissions"::30000.0], "wooden_building"::["gCO2e emissions"::300000.0], "plastic_factory"::["gCO2e emissions"::50000000.0], "kg_plastic"::["gCO2e emissions"::0.0]];
-	map<string, map<string, float>>	supply_upkeep_U <- ["modular_house_lobby"::["m² land"::0.0, "kg_plastic"::1291.0], "modular_house_extension"::["m² land"::50.0, "m3_wood"::0.0, "kg_plastic"::383.23], "wooden_building"::["m² land"::100.0, "m3_wood"::6.24, "kg_plastic"::0.0], "plastic_factory"::["m² land"::1000000.0]];
+	map<string, map<string, float>>	supply_upkeep_U <- ["modular_house_lobby"::["m² land"::0.0, "kg_plastic"::1291.0/12.0], "modular_house_extension"::["m² land"::50.0, "m3_wood"::0.0, "kg_plastic"::383.23/12.0], "wooden_building"::["m² land"::100.0, "m3_wood"::6.24/12.0, "kg_plastic"::0.0], "plastic_factory"::["m² land"::1000000.0]];
 	float factory_production_capacity <- 11000000.0;
-	map<string, float> individual_consumption_U <- ["modular_house_extension"::1.0, "modular_house_lobby"::0.05, "wooden_building"::0.000175];
+	map<string, float> individual_consumption_U <- ["modular_house_extension"::1.0*(1-wooden_building_ratio), "modular_house_lobby"::0.05*(1-wooden_building_ratio), "wooden_building"::0.0208*wooden_building_ratio];
 	
 	map<string, float> supplies_U <- ["modular_house_extension"::70000000.0, "modular_house_lobby"::3500000.0, "wooden_building"::1400.0, "plastic_factory"::10.0];
 	map<string, int> time_cost_U <- ["modular_house_extension"::1, "modular_house_lobby"::3, "wooden_building"::6, "plastic_factory"::48];
@@ -320,6 +324,9 @@ species urbanplanning parent: bloc {
 				
 			}
 			
+			write "wood used :";
+			write tick_resources_used["m3_wood"];
+			
 			return ok;
 		}
 
@@ -524,18 +531,18 @@ experiment run_urban type: gui {
 				loop c over: production_outputs_U {
 					data c value: tick_production_U[c];
 				}
-				loop a over: autoproduction_U{
-					data a value: tick_production_U[a];
-				}
+//				loop a over: autoproduction_U{
+//					data a value: tick_production_U[a];
+//				}
 			}
 
 			chart "Resources usage" type: series size: {0.5, 0.5} position: {0, 0.5} {
 				loop r over: production_inputs_U {
 					data r value: tick_resources_used_U[r];
 				}
-				loop a over: autoproduction_U{
-					data a value: tick_resources_used_U[a];
-				}
+//				loop a over: autoproduction_U{
+//					data a value: tick_resources_used_U[a];
+//				}
 			}
 
 			chart "Production emissions" type: series size: {0.5, 0.5} position: {0.5, 0.5} {
