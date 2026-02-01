@@ -73,6 +73,21 @@ species agricultural parent: bloc {
 	string name <- "agricultural";
 	agri_producer producer <- nil;
 	agri_consumer consumer <- nil;
+	
+	/* ----- MICRO VAR ----- */
+	list<farm> farms_list;
+	float total_farms_surface <- 0.0;
+	float max_farm_surface_m2 <- 35.0 * 1e4; //taille moyenne en france 70 ha 2020
+	float min_farm_surface_m2 <- 5.0 * 1e4;
+	
+	// Farm distribution parameters
+    float meat_farm_ratio <- 0.25;
+    float veg_farm_ratio <- 0.35;
+    float mixed_farm_ratio <- 0.2;
+    float cotton_farm_ratio <- 0.2;
+    
+    /* Shortage tracking (0 = no shortage; 1 = complete shortage) */
+    map<string, float> food_shortage <- ["kg_meat"::0.0, "kg_vegetables"::0.0];
 
 	action setup {
 		list<agri_producer> producers <- [];
@@ -122,6 +137,10 @@ species agricultural parent: bloc {
 		return production_emissions_A;
 	}
 
+    map<string, float> get_food_shortage {
+    	return food_shortage;
+    }
+
 	action collect_last_tick_data {
 		if (cycle > 0) { // skip it the first tick
 			tick_pop_consumption_A <- consumer.get_tick_consumption(); // collect consumption behaviors
@@ -145,6 +164,16 @@ species agricultural parent: bloc {
 	}
 
 	action population_activity (list<human> pop) {
+
+		loop product over: food_shortage.keys {
+			food_shortage[product] <- 0.0;
+		}
+
+		ask pop {
+			additional_attributes["shortage_mortality_coeff"] <- "1.0";
+		}
+
+		
 		ask pop { // execute the consumption behavior of the population
 			ask myself.agri_consumer {
 				do consume(myself); // individuals consume agricultural goods
@@ -153,21 +182,53 @@ species agricultural parent: bloc {
 		}
 
 		ask agri_consumer { // produce the required quantities
+		
+			float total_meat_demand <- consumed["kg_meat"];
+            float remaining_meat_demand <- max(0, total_meat_demand - kg_gibier_monthly);
+            
+            agricultural agri_ref <- myself;
+            float max_mortality_coef <- 1.0;
+                        
 			ask agri_producer {
-				loop c over: myself.consumed.keys {
-					bool ok <- produce([c::myself.consumed[c]]); // send the demands to the producer
-					if ok {
-						float quantity_consumed <- myself.consumed[c];
-						if (c = "kg_meat") {
-							stock_meat <- stock_meat - quantity_consumed;
-						} else if (c = "kg_vegetables") {
-							stock_veg <- stock_veg - quantity_consumed;
-						}
+                bool ok;
+                loop c over: myself.consumed.keys {
+                	float demand_qty;
+                	if (c = "kg_meat"){
+                		demand_qty <- remaining_meat_demand;
+                		ok <- produce(["kg_meat"::remaining_meat_demand]);
+                	} else {
+                		demand_qty <- myself.consumed[c];
+                		ok <- produce([c::myself.consumed[c]]);
+                	}
+                	
+            		if not ok {
+            			//write "Pénurie de " + c + " , stock est " + round(100 * products_stock[c]/myself.consumed[c]) + "% de demande totale.";
+            			
+            			float shortage_coef <- 0.0;
+            			if (demand_qty > 0) {
+            				if (products_stock[c] <= 0) {
+            					shortage_coef <- 1.0;
+            				} else if (products_stock[c] < demand_qty) {
+            					shortage_coef <- (demand_qty - products_stock[c]) / demand_qty;
+            				}
+            			}
+            			
+            			agri_ref.food_shortage[c] <- shortage_coef;
+            			
+            			// Calcul new coeff (*5 to check)
+            			if (shortage_coef > 0) {
+            				float mortality_coef <- 1.0 + shortage_coef*5;
+            				max_mortality_coef <- max([max_mortality_coef, mortality_coef]);
+            			}
+            		}
+                }
 
-					}
-
+			}
+			// Apply coeff to humans
+			if (max_mortality_coef > 1.0) {
+				ask pop {
+					additional_attributes["shortage_mortality_coeff"] <- string(max_mortality_coef);
 				}
-
 			}
 
 		}
@@ -281,18 +342,42 @@ species agricultural parent: bloc {
 			bool ok <- true;
 			bool ok_surface <- true;
 			loop c over: demand.keys {
-				loop u over: production_inputs_A {
-					float quantity_needed <- production_output_inputs_A[c][u] * demand[c]; // quantify the resources consumed/emitted by this demand
-					tick_resources_used[u] <- tick_resources_used[u] + quantity_needed;
-					if (external_producers.keys contains u) { // if there is a known external producer for this product/good
-						bool av <- external_producers[u].producer.produce([u::quantity_needed]); // ask the external producer to product the required quantity
-						if (u = "m² land") {
-							if av {
-								if (c = "kg_vegetables") {
-									surface_veg <- surface_veg + quantity_needed;
-								} else if (c = "kg_meat") {
-									surface_meat <- surface_meat + quantity_needed;
-								}
+				if (products_stock[c] >= demand[c]) {
+					products_stock[c] <- products_stock[c] - demand[c];
+				} else {
+					ok <- false;
+				}
+			}
+			
+			return ok;
+		}
+		
+		action produce_from_farms (list<farm> farm_list) {
+			ask farms_list {
+				map<string, map<string, float>> resources_needed <- get_product_resources_needed();
+				float quota_received <- 1.0; //assumption for the moment that is 100% met or nothing
+				
+				loop product over: resources_needed.keys {
+					loop ressource over: resources_needed[product].keys {
+						float qty_needed <- resources_needed[product][ressource];
+						
+						if (myself.external_producers.keys contains ressource) {
+							bool available <- myself.external_producers[ressource].producer.produce([ressource::qty_needed]);
+							
+							if not available {
+								// TODO implement partial availability (penurie case)
+								quota_received <- 0.0;
+								//write "PRODUCTION : Farm " + name + " " + farm_type + " cannot get " + ressource + " for " + product;
+							} else {
+								myself.tick_resources_used[ressource] <- myself.tick_resources_used[ressource] + qty_needed;
+							}
+						}
+					}
+				}
+				
+				do farm_produce(quota_received);
+				
+				map<string, float> farm_production <- get_produced();
 
 							} else {
 								ok_surface <- false;
