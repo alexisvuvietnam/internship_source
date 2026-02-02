@@ -146,6 +146,7 @@ experiment main_experiment type: gui {
 		monitor "GES émis énergie" value: world.tick_emissions_E["gCO2e emissions"];
 		monitor "GES émis transport" value: world.tick_emissions_T["gCO2e emissions"];
 		monitor "GES absorbés par l'environnement" value: world.tick_absorbed_ECO["gCO2e emissions"];
+		monitor "Surface disponible totale" value: world.available_surface;
 
 		// Affichage de la consommation d'énergie
 		display "Répartition de la consommation d'énergie pour chaque secteur" type: 2d {
@@ -174,7 +175,7 @@ experiment main_experiment type: gui {
 		}
 
 		display "Évolution de la consommation d'eau pour chaque secteur" type: 2d {
-			chart "Évolution de la consommation d'eau pour chaque secteur" type: series {
+			chart "Évolution de la consommation d'eau pour chaque secteur" type: series{
 				data "Agriculture" value: world.tick_resources_used_A["L water"] color: #orange;
 				data "Énergie" value: world.tick_resources_used_E["L water"] color: #yellow;
 			}
