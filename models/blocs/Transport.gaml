@@ -601,7 +601,7 @@ bool produce(map<string,float> demand) {
 	
 	species long_trip{
 		map<string, float> long_trip_decisions_france_data <- ["trip_tgv"::0.01845,"trip_ter"::0.13205,"trip_taxi"::0.8495]; // pas utilisé
-		map<string, float> long_trip_decisions_ecotopia <- ["trip_tgv"::0.30,"trip_ter"::0.65,"trip_taxi"::0.05];
+		map<string, float> long_trip_decisions_ecotopia <- ["trip_tgv"::0.30,"trip_ter"::0.60,"trip_taxi"::0.1];
 		map<string, float> max_trip_all <- ["trip_tgv"::0,"trip_ter"::0,"trip_taxi"::0];
 		float avg_long_trip_distance <- 300.0; // average distance for long trips
 		
@@ -615,8 +615,8 @@ bool produce(map<string,float> demand) {
 			ask my_taxis {
 				int capacity <-  ref_vehicle.max_passenger_capacity;
 				int current_number <- number_available;
-				write 'taxi';
-				write current_number;
+				//write 'taxi';
+				//write current_number;
 				int max_trip_v <- max_trips_per_tick; // per vehicule
 				myself.max_trip_all['trip_taxi']<- current_number * max_trip_v * capacity; // max trip pour tout les vehicules de ce type (en nombre de passagers)
 				
@@ -624,16 +624,16 @@ bool produce(map<string,float> demand) {
 			ask my_ters {
 				int capacity <-  ref_vehicle.max_passenger_capacity;
 				int current_number <- number_available;
-				write 'ter';
-				write current_number;
+				//write 'ter';
+				//write current_number;
 				int max_trip_v <- max_trips_per_tick; // per vehicule
 				myself.max_trip_all['trip_ter']<- current_number * max_trip_v * capacity; // max trip pour tout les vehicules de ce type
 			}
 			ask my_tgvs {
 				int capacity <-  ref_vehicle.max_passenger_capacity;
 				int current_number <- number_available;
-				write 'tgv';
-				write current_number;
+				//write 'tgv';
+				//write current_number;
 				int max_trip_v <- max_trips_per_tick; // per vehicule
 				myself.max_trip_all['trip_tgv']<- current_number * max_trip_v * capacity; // max trip pour tout les vehicules de ce type
 			}
@@ -714,7 +714,7 @@ bool produce(map<string,float> demand) {
 	}
 	
 	species short_trip{
-		map<string, float> short_trip_decisions <- ["trip_bike"::0.7, "trip_minibus"::0.05,"trip_walking"::0.25];
+		map<string, float> short_trip_decisions <- ["trip_bike"::0.3, "trip_minibus"::0.2,"trip_walking"::0.5];
 		map<string, float> max_trip_all <- ["trip_minibus"::0,"trip_bike"::0];
 		float avg_short_trip_distance <- 4.0; // average distance for short trips
 		
@@ -948,127 +948,175 @@ species transport_mode {
 	float km_age; // initialisé à la mi-vie
 	int km_end_of_life; 
 	float alpha;
+	float prod_speed;
+	int prod_incr <- 0;
 
-action update_available(float km_travelled, transport parent_transport){
-    int to_add <- 0;
-    string product_name <- "";
-
-    switch(type) {
-        match "taxis" {
-            to_add <- world.production_vehicules["taxi"];
-            product_name <- "taxi";
-        }
-        match "tgvs" {
-            to_add <- world.production_vehicules["tgv"];
-            product_name <- "tgv";
-        }
-        match "ters" {
-            to_add <- world.production_vehicules["ter"];
-            product_name <- "ter";
-        }
-        match "minibuses" {
-            to_add <- world.production_vehicules["minibus"];
-            product_name <- "minibus";
-        }
-        match "bikes" {
-            to_add <- world.production_vehicules["bike"];
-            product_name <- "bike";
-        }
-    }
-
-    if (to_add > 0 and parent_transport != nil and parent_transport.producer != nil) {
-        ask parent_transport.producer {
-            do produce([product_name :: float(to_add)]);
-        }
-        
-        float old_total_km <- km_age * number_available;
-        number_available <- number_available + to_add;
-        km_age <- old_total_km / number_available;
-
-        write type + ": Added " + to_add + " new vehicles. Total: " + number_available + ", New avg km_age: " + km_age;
-    }
-
-    if (number_available > 0 and km_travelled > 0) {
-        km_age <- km_age + km_travelled / number_available;
-
-        if (km_age > km_end_of_life) {
-            float excess_ratio <- (km_age - km_end_of_life) / km_end_of_life;
-            int detruit <- int(number_available * excess_ratio * 0.1);
-
-            detruit <- min(detruit, number_available - max(1, int(0.1 * number_available)));
-            
-            if (detruit > 0) {
-                number_available <- number_available - detruit;
-                write type + ": DESTROYED " + detruit + " vehicles. Remaining: " + number_available;
-
-                if(number_available > 0) {
-                    km_age <- km_age * 0.95;
-                }
-            }
-        }
-    }
-}
+	action update_available(float km_travelled, transport parent_transport){
+	    int to_add <- 0;
+	    string product_name <- "";
+	
+	    switch(type) {
+	        match "taxis" {
+	            to_add <- world.production_vehicules["taxi"];
+	            product_name <- "taxi";
+	        }
+	        match "tgvs" {
+	            to_add <- world.production_vehicules["tgv"];
+	            product_name <- "tgv";
+	        }
+	        match "ters" {
+	            to_add <- world.production_vehicules["ter"];
+	            product_name <- "ter";
+	        }
+	        match "minibuses" {
+	            to_add <- world.production_vehicules["minibus"];
+	            product_name <- "minibus";
+	        }
+	        match "bikes" {
+	            to_add <- world.production_vehicules["bike"];
+	            product_name <- "bike";
+	        }
+	    }
+		if (parent_transport != nil and product_name != "") {
+		    float usage <- transport_usage[world.mode_to_trip[product_name] ];
+			write type+": "+number_available;
+		    // Ramp up production (si +90% d'utilisation)
+		    if (usage >= 0.9) {
+		        prod_incr <- prod_incr + 1; //max( 10, prod_incr + 1);
+		    } 
+		    if (usage < 0.9) { 
+		    	 prod_incr <-   max(-5, prod_incr - 1);
+		    }
+		    if (usage < 0.7) { 
+		    	 prod_incr <-   0;
+		    }
+		    
+		    to_add <- max(0, to_add + int(to_add * prod_speed *  prod_incr));
+		}
+		
+	    if (to_add > 0 and parent_transport != nil and parent_transport.producer != nil) {
+	        ask parent_transport.producer {
+	            do produce([product_name :: float(to_add)]);
+	        }
+	        
+	        float old_total_km <- km_age * number_available;
+	        number_available <- number_available + to_add;
+	        km_age <- old_total_km / number_available;
+	
+	        //write type + ": Added " + to_add + " new vehicles. Total: " + number_available + ", New avg km_age: " + km_age;
+	    }
+	
+	    if (number_available > 1 and km_travelled > 0) {
+	        km_age <- km_age + km_travelled / number_available;
+	
+	            float excess_ratio <- ((km_age - km_end_of_life) / km_end_of_life)  ^ alpha;
+	            int detruit <- int(number_available * excess_ratio * 0.1);
+	
+	            detruit <- min(detruit, number_available - max(1, int(0.1 * number_available)));
+	            
+	            if (detruit > 0) {
+	                number_available <- number_available - detruit;
+	                write type + ": DESTROYED " + detruit;
+	
+	                if(number_available > 0) {
+	                    km_age <- km_age * 0.95;
+	                }
+	            }
+	    }
+	}
  }
+ 
 species taxis parent:transport_mode {
 	init{
 		type <- "taxis";
 		number_available <- 45000;
 		create taxi_vehicle number:1;
 		ref_vehicle <- first(taxi_vehicle);
-		max_trips_per_tick <- vehicle_max_trips["taxi"]; // 11 par jours
-		km_age <- 100000.0; // fin de vie vers 160-200K km
+		max_trips_per_tick <- vehicle_max_trips["taxi"]; 
+		km_age <- 100000.0; 
 		km_end_of_life <- 200000;
 		alpha <- 6.0;
+        
+        prod_speed <- 0.4;  // Mass production, fast
 	}
 }
+
 species tgvs parent:transport_mode {
 	init{
 		type <- "tgvs";
 		number_available <- 450;
 		create tgv_vehicle number:1;
 		ref_vehicle <- first(tgv_vehicle);
-		max_trips_per_tick <- vehicle_max_trips["tgv"]; // 4 par jours
-		km_age <- 7500000.0; // fin de vie vers 12-18M km
+		max_trips_per_tick <- vehicle_max_trips["tgv"]; 
+		km_age <- 7500000.0; 
 		km_end_of_life <- 18000000;
 		alpha <- 6.0;
+        
+        prod_speed <- 0.02; // Very slow 
 	}
 }
+
 species ters parent:transport_mode {
 	init{
 		type <- "ters";
 		number_available <- 2500;
 		create ter_vehicle;
 		ref_vehicle <- first(ter_vehicle);
-		max_trips_per_tick <- vehicle_max_trips["ter"]; // 8 par jours (6-10)
-		km_age <- 5000000.0; // fin de vie vers 8-12M km
+		max_trips_per_tick <- vehicle_max_trips["ter"]; 
+		km_age <- 5000000.0; 
 		km_end_of_life <- 12000000;
 		alpha <- 6.0;
+        
+        prod_speed <- 0.08; // Slow (heavy rolling stock)
 	}
 }
+
 species minibuses parent:transport_mode {
 	init{
 		type <- "minibuses";
 		number_available <- 28000;
 		create minibus_vehicle;
 		ref_vehicle <- first(minibus_vehicle);
-		max_trips_per_tick <- vehicle_max_trips["minibus"]; // 13, (10-15) par
-		km_age <- 500000.0; // fin de vie vers 800K-1.2M km
+		max_trips_per_tick <- vehicle_max_trips["minibus"]; 
+		km_age <- 500000.0; 
 		km_end_of_life <- 1200000;
 		alpha <- 6.0;
+        
+        prod_speed <- 0.3; // Moderate 
 	}
 }
+
 species bikes parent:transport_mode {
 	init{
 		type <- "bikes";
 		number_available <- 3500000;
 		create bike_vehicle number:1;
 		ref_vehicle <- first(bike_vehicle);
-		max_trips_per_tick <- vehicle_max_trips["bike"]; // 5-10 trajets par
-		km_age <- 25500.0; // fin de vie vers 40-70K km
+		max_trips_per_tick <- vehicle_max_trips["bike"]; 
+		km_age <- 25500.0; 
 		km_end_of_life <- 70000;
 		alpha <- 6.0;
+        
+        prod_speed <- 0.8; // Very fast 
 	}
 }
+
+species trucks parent:transport_mode {
+	truck_vehicle truck <- nil;
+	init{
+		type <- "trucks";
+		number_available <- 305800;
+		create truck_vehicle number:1;
+		ref_vehicle <- first(truck_vehicle);
+		max_trips_per_tick <- vehicle_max_trips["truck"]; 
+		km_age <- 612500.0; 
+		km_end_of_life <- 1500000;
+		alpha <- 6.0;
+        
+        prod_speed <- 0.15; 
+	}
+}
+
 species legs parent:transport_mode {
 	init{
 		type <- "legs";
@@ -1077,22 +1125,10 @@ species legs parent:transport_mode {
 		ref_vehicle <- first(legs_vehicle);
 		max_trips_per_tick <- 3;
 		alpha <- 6.0;
+        
+        prod_speed <- 0.0; 
 	}
 }
-species trucks parent:transport_mode {
-	truck_vehicle truck <- nil;
-	init{
-		type <- "trucks";
-		number_available <- 305800;
-		create truck_vehicle number:1;
-		ref_vehicle <- first(truck_vehicle);
-		max_trips_per_tick <- vehicle_max_trips["truck"]; // 1.5 par jours
-		km_age <- 612500.0; // fin de vie vers 1-1.5M km
-		km_end_of_life <- 1500000;
-		alpha <- 6.0;
-	}
-}
-
 /**
  * We define here the experiment and the displays related to transport. 
  * We will then be able to run this experiment from the Main code of the simulation, with all the blocs connected.
