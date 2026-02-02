@@ -62,7 +62,7 @@ global{
 	    "L water":: ["nuclear"::1.0, "wind"::1.0, "hydro"::1.0, "solar"::1.0]
 		*/
 	    "m² land":: ["nuclear"::1500000.0, "wind"::500.0, "hydro"::2000000.0, "solar"::20000.0],
-	    "L water":: ["nuclear"::0.0, "wind"::0.0, "hydro"::0.0, "solar"::0.0]
+	    "L water":: ["nuclear"::800000.0, "wind"::50.0, "hydro"::0.0, "solar"::100.0]
 	    /**/
 	];
     
