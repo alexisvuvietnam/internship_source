@@ -44,6 +44,17 @@ global {
 	map<string, float> tick_resources_used_T <- [];
 	map<string, float> tick_emissions_T <- [];
 	
+	// renouvelement des véhicule
+	int r_m <- 1;
+	map<string,int> production_vehicules <- [
+	    "taxi"::2000*r_m,       // 2,000 per month (~24k/year)
+	    "tgv"::1*r_m,           // ~1 per month (~12/year)
+	    "ter"::7*r_m,           // ~7 per month (~84/year)
+	    "minibus"::60*r_m,      // ~60 per month (~720/year)
+	    "bike"::4000*r_m        // 4,000 per month (~48k/year)
+	];
+	
+	
 	list<string> short_transport <- ["trip_minibus","trip_bike","trip_walking"];
 	list<string> long_transport <- ["trip_tgv", "trip_ter", "trip_taxi"];
 	list<string> transport_name <- ["trip_minibus","trip_tgv","trip_ter","trip_taxi"];
@@ -75,7 +86,14 @@ global {
 	];
 	
     // max trip per month
-    map<string, int> vehicle_max_trips <- ["taxi"::330, "tgv"::120, "ter"::240, "minibus"::390, "bike"::225];
+	 map<string, int> vehicle_max_trips <- [
+	    "taxi"::30,
+	    "tgv"::90,
+	    "ter"::120,
+	    "minibus"::250,
+	    "bike"::100
+	];
+
     
 	init{ // a security added to avoid launching an experiment without the other blocs
 		if (length(coordinator) = 0){
@@ -116,7 +134,7 @@ species transport parent:bloc{
 	
 	//number of long trips or short trips in a month is decided by the hypothesises explained in the paper
     int short_trips_per_week <- 14; // average of 2 trips per day
-    int long_trips_per_week <- 2;
+    int long_trips_per_week <- 1;
     
     // boolean values to handle shortage
     bool do_long_trips <- true;
@@ -375,26 +393,26 @@ species transport parent:bloc{
 	}
 	
 	action update_transport_available {
-		ask long_trip {
-			ask my_taxis {
-				do update_available(km_per_tick["taxi"]);
-			}
-			ask my_ters {
-				do update_available(km_per_tick["ter"]);
-			}
-			ask my_tgvs {
-				do update_available(km_per_tick["tgv"]);
-			}
-		}
-		ask short_trip {
-			ask my_minibuses {
-				do update_available(km_per_tick["minibus"]);
-			}
-			ask my_bikes {
-				do update_available(km_per_tick["bike"]);
-			}
-		}
-	}
+    ask long_trip {
+        ask my_taxis {
+            do update_available(km_per_tick["taxi"], transport(myself.host));
+        }
+        ask my_ters {
+            do update_available(km_per_tick["ter"], transport(myself.host));
+        }
+        ask my_tgvs {
+            do update_available(km_per_tick["tgv"], transport(myself.host));
+        }
+    }
+    ask short_trip {
+        ask my_minibuses {
+            do update_available(km_per_tick["minibus"], transport(myself.host));
+        }
+        ask my_bikes {
+            do update_available(km_per_tick["bike"], transport(myself.host));
+        }
+    }
+}
 
 	species transport_producer parent:production_agent{
 		map<string, bloc> external_producers <- []; // external producers that provide the needed resources
@@ -425,66 +443,48 @@ species transport parent:bloc{
 			}
 		}
 
-	bool produce(map<string,float> demand){
-			bool ok_trips <- true;
-			bool ok_build <- true;
-			loop c over: demand.keys{
-				if (production_trips contains c) { // demande d'energie pour des trajets
-		            loop u over: production_inputs_T {
-		            	float quantity_needed <- 0.0;
-		            	if (c in production_trips){
-	            			quantity_needed <- tick_trip_energy[c];
-	            		}
-						tick_resources_used[u] <- tick_resources_used[u] + quantity_needed;
-						if(external_producers.keys contains u){
-							bool av <- external_producers[u].producer.produce([u::quantity_needed]);
-							if not av{
-								ok_trips <- false; // if unable to produce enough electricity for trips
-								// in case of a shortage, we prioritise short trips over long trips
-								if (do_long_trips = true){
-									do_long_trips <- false;
-								}
-								else if (do_short_trips = true){
-									do_short_trips <-false; // setting the short trips to false will only set the minibus usage to 0
-								}
-							}
-							// recovery from shortage
-							else if (do_short_trips = false) {
-								do_short_trips <- true;
-							}
-							else if (do_long_trips = false) {
-								do_long_trips <- true;
-							}
-						}
-					}
-				}
-				// unused demands for now
-				else if (production_outputs_inputs_T.keys contains c) { // demande de ressources pour de la fabrication
-		            loop u over: production_inputs_T {
-		            	float quantity_needed <- 0.0;
-	            		// TODO: implémenter la logique de besoin de fabrication
-	            		if (production_outputs_inputs_T[c].keys contains u) {
-							quantity_needed <- production_outputs_inputs_T[c][u] * demand[c];
-						}
-						tick_resources_used[u] <- tick_resources_used[u] + quantity_needed;
-						if(external_producers.keys contains u){
-							bool av <- external_producers[u].producer.produce([u::quantity_needed]);
-							if not av{
-								ok_build <- false;
-							}
-						}
-					}
-					loop e over: production_emissions_T{
-						if (production_output_emissions_T[c].keys contains e) {
-							float quantity_emitted <- production_output_emissions_T[c][e] * demand[c];
-							tick_emissions[e] <- tick_emissions[e] + quantity_emitted;
-						}
-					}
-					tick_production[c] <- tick_production[c] + demand[c];
-				}
-			}
-		    return ok_trips;
-		}
+bool produce(map<string,float> demand) {
+    bool ok_trips <- true;
+    
+    // fabrication
+    loop c over: demand.keys {
+        if (production_outputs_inputs_T.keys contains c) { 
+            loop u over: production_inputs_T {
+                float qty <- (production_outputs_inputs_T[c].keys contains u) ? production_outputs_inputs_T[c][u] * demand[c] : 0.0;
+                tick_resources_used[u] <- tick_resources_used[u] + qty;
+                
+                if (external_producers.keys contains u) {
+                    // demande 
+                    bool av <- external_producers[u].producer.produce([u::qty]);
+                    if not av { write "/!\\ ÉCHEC CRITIQUE FABRICATION : " + c; }
+                }
+            }
+            tick_production[c] <- tick_production[c] + demand[c];
+        }
+    }
+
+    loop c over: demand.keys {
+        if (production_trips contains c) {
+            loop u over: production_inputs_T {
+                float qty_trip <- tick_trip_energy[c];
+                if (external_producers.keys contains u) {
+                    bool av <- external_producers[u].producer.produce([u::qty_trip]);
+                    if not av {
+                        ok_trips <- false;
+                        if (do_long_trips) { do_long_trips <- false; } 
+                        else if (do_short_trips) { do_short_trips <- false; }
+                    } else {
+                        // Récupération 
+                        if (!do_short_trips) { do_short_trips <- true; }
+                        else if (!do_long_trips) { do_long_trips <- true; }
+                        tick_resources_used[u] <- tick_resources_used[u] + qty_trip;
+                    }
+                }
+            }
+        }
+    }
+    return ok_trips;
+}
 		action set_supplier(string product, bloc bloc_agent){
 			write name +": external producer " + bloc_agent + " set for " + product;
 			external_producers[product] <- bloc_agent;
@@ -612,9 +612,9 @@ species transport parent:bloc{
 	
 	species long_trip{
 		map<string, float> long_trip_decisions_france_data <- ["trip_tgv"::0.01845,"trip_ter"::0.13205,"trip_taxi"::0.8495]; // pas utilisé
-		map<string, float> long_trip_decisions_ecotopia <- ["trip_tgv"::0.60,"trip_ter"::0.30,"trip_taxi"::0.10];
+		map<string, float> long_trip_decisions_ecotopia <- ["trip_tgv"::0.30,"trip_ter"::0.60,"trip_taxi"::0.1];
 		map<string, float> max_trip_all <- ["trip_tgv"::0,"trip_ter"::0,"trip_taxi"::0];
-		float avg_long_trip_distance <- 662.0; // average distance for long trips
+		float avg_long_trip_distance <- 300.0; // average distance for long trips
 		
 		// tick statistics
 		map<string, float> tick_trips_by_mode <- ["trip_tgv"::0.0, "trip_ter"::0.0, "trip_taxi"::0.0];
@@ -622,10 +622,12 @@ species transport parent:bloc{
 		map<string, float> trip_usage_by_mode <- ["trip_tgv"::0,"trip_ter"::0,"trip_taxi"::0];
 		
 		action process_long_trips(int trip_number){
-			
+			//write 'available :';
 			ask my_taxis {
 				int capacity <-  ref_vehicle.max_passenger_capacity;
 				int current_number <- number_available;
+				//write 'taxi';
+				//write current_number;
 				int max_trip_v <- max_trips_per_tick; // per vehicule
 				myself.max_trip_all['trip_taxi']<- current_number * max_trip_v * capacity; // max trip pour tout les vehicules de ce type (en nombre de passagers)
 				
@@ -633,27 +635,49 @@ species transport parent:bloc{
 			ask my_ters {
 				int capacity <-  ref_vehicle.max_passenger_capacity;
 				int current_number <- number_available;
+				//write 'ter';
+				//write current_number;
 				int max_trip_v <- max_trips_per_tick; // per vehicule
 				myself.max_trip_all['trip_ter']<- current_number * max_trip_v * capacity; // max trip pour tout les vehicules de ce type
 			}
 			ask my_tgvs {
 				int capacity <-  ref_vehicle.max_passenger_capacity;
 				int current_number <- number_available;
+				//write 'tgv';
+				//write current_number;
 				int max_trip_v <- max_trips_per_tick; // per vehicule
 				myself.max_trip_all['trip_tgv']<- current_number * max_trip_v * capacity; // max trip pour tout les vehicules de ce type
 			}
 			// distribute trips according to probabilities
-			loop mode over: long_trip_decisions_ecotopia.keys {
-				float mode_trips <- max(min(trip_number * long_trip_decisions_ecotopia[mode], max_trip_all[mode]), 0.0);
-				// pour avoir le nombre de trajet non réalisés faire trip*long - max_trip_all
-				float ratio_used <- 0.0;
-				if (max_trip_all[mode] != 0){ 
-					ratio_used <-  mode_trips/max_trip_all[mode]; // total_transport_used / max_usable
+			float next_mode <- 0.0;
+			loop mode over: long_trip_decisions_ecotopia.keys {  // order of priority
+				// max entre nombre de personne à déplacer et nombre de personne possible à déplacer
+				float mode_trips <- max(min(trip_number * long_trip_decisions_ecotopia[mode]+next_mode, max_trip_all[mode]), 0.0);
+				if(mode_trips = max_trip_all[mode]){
+					next_mode <-(trip_number * long_trip_decisions_ecotopia[mode]+next_mode)-mode_trips; // passagers restants
 				}
+				// pour avoir le nombre de trajet non réalisés faire trip*long - max_trip_all
+				float ratio_used;
+				if (max_trip_all[mode] > 0) {
+				    ratio_used <- mode_trips / max_trip_all[mode];
+				} else if (mode_trips > 0) {
+				    ratio_used <- 1.0; // fully saturated
+				} else {
+				    ratio_used <- 0.0;
+				}
+					
 				tick_trips_by_mode[mode] <- tick_trips_by_mode[mode] + mode_trips;
 				trip_usage_by_mode[mode] <- ratio_used;
-				
+			
 			}
+			/*write "long_trip_usage";
+			write "tick trips";
+			write tick_trips_by_mode;
+			write "tick usage ratio";
+			write trip_usage_by_mode;
+			write "tick max trips";
+			write max_trip_all;*/
+			next_mode <- 0.0;
 			// process energy consumption for each mode
 			ask my_tgvs {
 				float nb_trips <- myself.tick_trips_by_mode["trip_tgv"];
@@ -701,7 +725,7 @@ species transport parent:bloc{
 	}
 	
 	species short_trip{
-		map<string, float> short_trip_decisions <- ["trip_minibus"::0.243,"trip_bike"::0.074,"trip_walking"::0.683];
+		map<string, float> short_trip_decisions <- ["trip_bike"::0.3, "trip_minibus"::0.2,"trip_walking"::0.5];
 		map<string, float> max_trip_all <- ["trip_minibus"::0,"trip_bike"::0];
 		float avg_short_trip_distance <- 4.0; // average distance for short trips
 		
@@ -724,17 +748,29 @@ species transport parent:bloc{
 					myself.max_trip_all['trip_bike']<- current_number * max_trip_v * capacity; // max trip pour tout les vehicules de ce type
 				}
 			// distribute trips according to probabilities
+			float next_mode <- 0.0;
 			loop mode over: short_trip_decisions.keys {
 				if(mode!="trip_walking"){
-					float mode_trips <- max(min(trip_number * short_trip_decisions[mode], max_trip_all[mode]), 0);
-					float ratio_used <- 0.0;
-					if(max_trip_all[mode] != 0){
-						ratio_used <-  mode_trips/max_trip_all[mode]; // total_transport_used / max_usable
+					float mode_trips <- max(min(trip_number * short_trip_decisions[mode]+next_mode, max_trip_all[mode]), 0);
+					if(mode_trips = max_trip_all[mode]){
+						next_mode <-(trip_number * short_trip_decisions[mode]+next_mode)-mode_trips; // passagers restants
 					}
+					
+					float ratio_used;
+					if (max_trip_all[mode] > 0) {
+					    ratio_used <- mode_trips / max_trip_all[mode];
+					} else if (mode_trips > 0) {
+					    ratio_used <- 1.0; // fully saturated
+					} else {
+					    ratio_used <- 0.0;
+					}
+
 					tick_trips_by_mode[mode] <- tick_trips_by_mode[mode] + mode_trips;
 					trip_usage_by_mode[mode] <- ratio_used;
 				}
 			}
+			next_mode <- 0.0;
+			
 			// process energy consumption for each mode
 			if (do_short_trips = true){ // handles energy shortage
 				ask my_minibuses {
@@ -923,77 +959,175 @@ species transport_mode {
 	float km_age; // initialisé à la mi-vie
 	int km_end_of_life; 
 	float alpha;
+	float prod_speed;
+	int prod_incr <- 0;
 
-	action update_available(float km_travelled){
-		if (number_available != 0){
-			km_age <- km_age + km_travelled / number_available; // km_travelled est pour tous les véhicules
-			// TODO ajouter la maintenance
-			float ratio <- (km_age / km_end_of_life) ^ alpha;
-			number_available <- max(number_available - int(number_available * ratio), 0); // max support emotionnel
-			// write(number_available);
-		}	
+	action update_available(float km_travelled, transport parent_transport){
+	    int to_add <- 0;
+	    string product_name <- "";
+	
+	    switch(type) {
+	        match "taxis" {
+	            to_add <- world.production_vehicules["taxi"];
+	            product_name <- "taxi";
+	        }
+	        match "tgvs" {
+	            to_add <- world.production_vehicules["tgv"];
+	            product_name <- "tgv";
+	        }
+	        match "ters" {
+	            to_add <- world.production_vehicules["ter"];
+	            product_name <- "ter";
+	        }
+	        match "minibuses" {
+	            to_add <- world.production_vehicules["minibus"];
+	            product_name <- "minibus";
+	        }
+	        match "bikes" {
+	            to_add <- world.production_vehicules["bike"];
+	            product_name <- "bike";
+	        }
+	    }
+		if (parent_transport != nil and product_name != "") {
+		    float usage <- transport_usage[world.mode_to_trip[product_name] ];
+			write type+": "+number_available;
+		    // Ramp up production (si +90% d'utilisation)
+		    if (usage >= 0.9) {
+		        prod_incr <- prod_incr + 1; //max( 10, prod_incr + 1);
+		    } 
+		    if (usage < 0.9) { 
+		    	 prod_incr <-   max(-5, prod_incr - 1);
+		    }
+		    if (usage < 0.7) { 
+		    	 prod_incr <-   0;
+		    }
+		    
+		    to_add <- max(0, to_add + int(to_add * prod_speed *  prod_incr));
+		}
+		
+	    if (to_add > 0 and parent_transport != nil and parent_transport.producer != nil) {
+	        ask parent_transport.producer {
+	            do produce([product_name :: float(to_add)]);
+	        }
+	        
+	        float old_total_km <- km_age * number_available;
+	        number_available <- number_available + to_add;
+	        km_age <- old_total_km / number_available;
+	
+	        //write type + ": Added " + to_add + " new vehicles. Total: " + number_available + ", New avg km_age: " + km_age;
+	    }
+	
+	    if (number_available > 1 and km_travelled > 0) {
+	        km_age <- km_age + km_travelled / number_available;
+	
+	            float excess_ratio <- ((km_age - km_end_of_life) / km_end_of_life)  ^ alpha;
+	            int detruit <- int(number_available * excess_ratio * 0.1);
+	
+	            detruit <- min(detruit, number_available - max(1, int(0.1 * number_available)));
+	            
+	            if (detruit > 0) {
+	                number_available <- number_available - detruit;
+	                write type + ": DESTROYED " + detruit;
+	
+	                if(number_available > 0) {
+	                    km_age <- km_age * 0.95;
+	                }
+	            }
+	    }
 	}
-}
+ }
+ 
 species taxis parent:transport_mode {
 	init{
 		type <- "taxis";
-		number_available <- 119000;
+		number_available <- 45000;
 		create taxi_vehicle number:1;
 		ref_vehicle <- first(taxi_vehicle);
-		max_trips_per_tick <- vehicle_max_trips["taxi"]; // 11 par jours
-		km_age <- 100000.0; // fin de vie vers 160-200K km
+		max_trips_per_tick <- vehicle_max_trips["taxi"]; 
+		km_age <- 100000.0; 
 		km_end_of_life <- 200000;
 		alpha <- 6.0;
+        
+        prod_speed <- 0.4;  // Mass production, fast
 	}
 }
+
 species tgvs parent:transport_mode {
 	init{
 		type <- "tgvs";
-		number_available <- 350;
+		number_available <- 450;
 		create tgv_vehicle number:1;
 		ref_vehicle <- first(tgv_vehicle);
-		max_trips_per_tick <- vehicle_max_trips["tgv"]; // 4 par jours
-		km_age <- 7500000.0; // fin de vie vers 12-18M km
+		max_trips_per_tick <- vehicle_max_trips["tgv"]; 
+		km_age <- 7500000.0; 
 		km_end_of_life <- 18000000;
 		alpha <- 6.0;
+        
+        prod_speed <- 0.02; // Very slow 
 	}
 }
+
 species ters parent:transport_mode {
 	init{
 		type <- "ters";
 		number_available <- 2500;
 		create ter_vehicle;
 		ref_vehicle <- first(ter_vehicle);
-		max_trips_per_tick <- vehicle_max_trips["ter"]; // 8 par jours (6-10)
-		km_age <- 5000000.0; // fin de vie vers 8-12M km
+		max_trips_per_tick <- vehicle_max_trips["ter"]; 
+		km_age <- 5000000.0; 
 		km_end_of_life <- 12000000;
 		alpha <- 6.0;
+        
+        prod_speed <- 0.08; // Slow (heavy rolling stock)
 	}
 }
+
 species minibuses parent:transport_mode {
 	init{
 		type <- "minibuses";
 		number_available <- 28000;
 		create minibus_vehicle;
 		ref_vehicle <- first(minibus_vehicle);
-		max_trips_per_tick <- vehicle_max_trips["minibus"]; // 13, (10-15) par
-		km_age <- 500000.0; // fin de vie vers 800K-1.2M km
+		max_trips_per_tick <- vehicle_max_trips["minibus"]; 
+		km_age <- 500000.0; 
 		km_end_of_life <- 1200000;
 		alpha <- 6.0;
+        
+        prod_speed <- 0.3; // Moderate 
 	}
 }
+
 species bikes parent:transport_mode {
 	init{
 		type <- "bikes";
-		number_available <- 16600000;
+		number_available <- 3500000;
 		create bike_vehicle number:1;
 		ref_vehicle <- first(bike_vehicle);
-		max_trips_per_tick <- vehicle_max_trips["bike"]; // 5-10 trajets par
-		km_age <- 25500.0; // fin de vie vers 40-70K km
+		max_trips_per_tick <- vehicle_max_trips["bike"]; 
+		km_age <- 25500.0; 
 		km_end_of_life <- 70000;
 		alpha <- 6.0;
+        
+        prod_speed <- 0.8; // Very fast 
 	}
 }
+
+species trucks parent:transport_mode {
+	truck_vehicle truck <- nil;
+	init{
+		type <- "trucks";
+		number_available <- 305800;
+		create truck_vehicle number:1;
+		ref_vehicle <- first(truck_vehicle);
+		max_trips_per_tick <- vehicle_max_trips["truck"]; 
+		km_age <- 612500.0; 
+		km_end_of_life <- 1500000;
+		alpha <- 6.0;
+        
+        prod_speed <- 0.15; 
+	}
+}
+
 species legs parent:transport_mode {
 	init{
 		type <- "legs";
@@ -1002,22 +1136,10 @@ species legs parent:transport_mode {
 		ref_vehicle <- first(legs_vehicle);
 		max_trips_per_tick <- 3;
 		alpha <- 6.0;
+        
+        prod_speed <- 0.0; 
 	}
 }
-species trucks parent:transport_mode {
-	truck_vehicle truck <- nil;
-	init{
-		type <- "trucks";
-		number_available <- 305800;
-		create truck_vehicle number:1;
-		ref_vehicle <- first(truck_vehicle);
-		max_trips_per_tick <- vehicle_max_trips["truck"]; // 1.5 par jours
-		km_age <- 612500.0; // fin de vie vers 1-1.5M km
-		km_end_of_life <- 1500000;
-		alpha <- 6.0;
-	}
-}
-
 /**
  * We define here the experiment and the displays related to transport. 
  * We will then be able to run this experiment from the Main code of the simulation, with all the blocs connected.
