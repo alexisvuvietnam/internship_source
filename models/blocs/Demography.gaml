@@ -36,6 +36,9 @@ global{
 	float births <- 0; // counter, accumulate the total number of births
 	float deaths <- 0; // counter, accumulate the total number of deaths
 	
+	// tracks the current food shortage impact on mortality
+	float shortage_mortality_factor <- 1.0; 
+	
 	init{  
 		// a security added to avoid launching an experiment without the other blocs
 		if (length(coordinator) = 0){
@@ -97,6 +100,22 @@ species residents parent:bloc{
 	action collect_last_tick_data{ // update stats & measures
 		int nb_men <- individual count(not dead(each) and each.gender = male_gender);
 		int nb_woman <-  individual count(not dead(each)) - nb_men;
+		
+		// Update shortage mortality factor
+		float total_shortage_coeff <- 0.0;
+		int count_with_coeff <- 0;
+		ask individual where (not dead(each)) {
+			if (additional_attributes contains_key "shortage_mortality_coeff") {
+				total_shortage_coeff <- total_shortage_coeff + float(additional_attributes["shortage_mortality_coeff"]);
+				count_with_coeff <- count_with_coeff + 1;
+				
+			}
+		}
+		if (count_with_coeff > 0) {
+			shortage_mortality_factor <- total_shortage_coeff / count_with_coeff;
+		} else {
+			shortage_mortality_factor <- 1.0;
+		}
 	}
 	
 	action population_activity(list<human> pop){
@@ -188,11 +207,27 @@ species individual parent:human{
 		return age_cat;
 	}
 	
-	/* returns the probability for the individual to die this year */
+	/* returns the probability for the individual to die this year + add food shortage coeff */
 	float get_p_death{ // compute monthly death probability of an individual
 		int age_cat <- get_age_category(death_proba[gender].keys);
-		float p_death <-  death_proba[gender][age_cat];
-		return  p_death * coeff_death;
+		//float p_death <-  death_proba[gender][age_cat];
+		//return  p_death * coeff_death;
+		float base_p_death <-  death_proba[gender][age_cat];
+
+		float shortage_coeff <- 1.0;
+		if (additional_attributes contains_key "shortage_mortality_coeff") {
+			shortage_coeff <- float(additional_attributes["shortage_mortality_coeff"]);
+		}
+		
+		float new_p_death <- min([base_p_death * coeff_death * shortage_coeff,1.0]);
+		if shortage_coeff > 1.0{
+			if(flip(p_death)){ // every individual has a chance to die every month, or die by reaching max_age
+					deaths <- deaths +1;
+					do die;
+		}
+		}
+		
+		return new_p_death;
 	}
 	
 	/* returns the probability for the individual to give birth this year */
