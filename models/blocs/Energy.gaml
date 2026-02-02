@@ -1,5 +1,5 @@
 /**
-* Name: Energy bloc (MOSIMA)
+* Name: Energy bloc (MOSIMA) - Version Micro avec Mix Énergétique
 * Authors: Maël Franceschetti, Cédric Herpson, Jean-Daniel Kant
 * Mail: firstname.lastname@lip6.fr
 */
@@ -8,157 +8,234 @@ model Energy
 
 import "../API/API.gaml"
 
-/**
- * We define here the global variables and data of the bloc. Some are needed for the displays (charts, series...).
- */
 global{
-
 	/* Setup */
-	list<string> production_inputs_E <- ["L water", "m² land", "m3_wood", "kg_coton"];
+	list<string> production_inputs_E <- ["L water", "m² land", "m3_wood", "kg_cotton"];
 	list<string> production_outputs_E <- ["kWh energy"];
 	list<string> production_emissions_E <- ["gCO2e emissions"];
 	
 	/* Production data */
-	// Types d'énergie
-    list<string> energy_types <- ["nuclear", "hydro", "wind", "solar"];
-    // Saisons 
+	list<string> energy_types <- ["nuclear", "hydro", "wind", "solar"];
     list<string> saisons <- ["spring", "summer", "autumn", "winter"];
     
-    // Structure: energy_type -> resource -> quantité par kWh
-    map<string, map<string, float>> production_inputs_per_kWh <- [
-        "nuclear"::["L water"::50.0],//, "m² land"::0.001],
-        "hydro"::["L water"::100.0],//, "m² land"::0.002],
-        "wind"::["L water"::10.0],//, "m² land"::0.005],
-        "solar"::["L water"::5.0]//, "m² land"::0.010]
-    ];
-    
-    // Structure: energy_type -> émissions par kWh
-    map<string, float> emissions_per_kWh <- [
-        "nuclear"::10.0,
-        "hydro"::5.0,
-        "wind"::2.0,
-        "solar"::1.0
-    ];
-	//  1m3_wood = 700kg_bois
-	map<string, map<string, float>> factory_construction_cost<- [
-		//"kg cotton"::["nuclear"::150000.0,"wind"::300.0,"hydro"::200000.0,"solar"::10.0],
-		//"kg_wood"::["nuclear"::300000.0,"wind"::200.0,"hydro"::500000.0,"solar"::50.0],
-		"m3_wood"::["nuclear"::428.571,"wind"::0.285,"hydro"::714.285,"solar"::0.0714],
-		"m² land"::["nuclear"::2500000.0,"wind"::4000.0,"hydro"::2000.0,"solar"::1.8]];
-		
-	map<string,float> stock <- ["kg cotton":: 1500000.0, "kg wood":: 300000.0, "m² land":: 1500000000000.0];
-		
-	/*tot     | 6260 | 312 | 4333| 135
-	printemps | 1565 | 118 | 990 | 35
-	été       | 1565 | 56  | 540 | 65
-	automne   |1565  | 87  | 1260| 25 
-	hiver     |1565  | 50  | 1710| 10  */
-	//production totale par m2
-	map<string,map<string, float>> factory_production<- 
-		["spring"::["nuclear"::521.7, "hydro"::39.3, "wind"::330.0, "solar"::11.7],
-		"summer"::["nuclear"::521.7, "hydro"::18.7, "wind"::180.0, "solar"::21.7],
-		"autumn"::["nuclear"::521.7, "hydro"::29.0, "wind"::420.0, "solar"::8.3],
-		"winter"::["nuclear"::521.7, "hydro"::16.7, "wind"::570.0, "solar"::3.3]
-	];
-	map<string,float> total_factory_production <-["nuclear"::6260.0, "hydro"::311.0, "wind"::4500.0, "solar"::135.0];
-
-    
-    //(N,1-4km2)(E,2 500-5 000m2)(S,1.7-2m2)(H,2000m2)
+	//Production totale annuelle par infrastructure (kWh)
+	map<string, float> total_factory_production <- ["nuclear"::32909000000.0, "hydro"::288000000.0, "wind"::157000000.0, "solar"::230000000.0];
 	
-	map<string, map<string, float>> factory_ressource<- [
-        "m² land"::["nuclear"::5000000.0,"wind"::4000.0,"hydro"::500000.0,"solar"::1.8],
-        "L water"::["nuclear"::2500000.0,"wind"::10000,"hydro"::10000000.0,"solar"::100000.0]
+    map<string, map<string,float>> factory_season_factor <- [
+    	"nuclear"::["spring"::0.25, "summer"::0.25, "autumn"::0.25, "winter"::0.25], 
+		"hydro"::["spring"::0.38, "summer"::0.18, "autumn"::0.28, "winter"::0.16], 
+		"wind"::["spring"::0.22, "summer"::0.12, "autumn"::0.27, "winter"::0.39], 
+		"solar"::["spring"::0.26, "summer"::0.48, "autumn"::0.18, "winter"::0.08]
+	];
+    
+    // Production par infrastructures et par tick (kWh)
+    map<string, map<string, float>> factory_production <- [
+    	"spring"::[
+			"nuclear"::(total_factory_production["nuclear"]*factory_season_factor["nuclear"]["spring"])/3,
+			"hydro"::(total_factory_production["hydro"]*factory_season_factor["hydro"]["spring"])/3,
+			"wind"::(total_factory_production["wind"]*factory_season_factor["wind"]["spring"])/3, 
+			"solar"::(total_factory_production["solar"]*factory_season_factor["solar"]["spring"])/3],
+					
+		"summer"::[
+			"nuclear"::(total_factory_production["nuclear"]*factory_season_factor["nuclear"]["summer"])/3,
+		   	"hydro"::(total_factory_production["hydro"]*factory_season_factor["hydro"]["summer"])/3,
+		   	"wind"::(total_factory_production["wind"]*factory_season_factor["wind"]["summer"])/3, 
+		   	"solar"::(total_factory_production["solar"]*factory_season_factor["solar"]["summer"])/3],
+		   	
+		"autumn"::[
+			"nuclear"::(total_factory_production["nuclear"]*factory_season_factor["nuclear"]["autumn"])/3,
+		   	"hydro"::(total_factory_production["hydro"]*factory_season_factor["hydro"]["autumn"])/3,
+		   	"wind"::(total_factory_production["wind"]*factory_season_factor["wind"]["autumn"])/3,
+		    "solar"::(total_factory_production["solar"]*factory_season_factor["solar"]["autumn"])/3],
+		    
+		"winter"::[
+			"nuclear"::(total_factory_production["nuclear"]*factory_season_factor["nuclear"]["winter"])/3,
+		   	"hydro"::(total_factory_production["hydro"]*factory_season_factor["hydro"]["winter"])/3,
+		   	"wind"::(total_factory_production["wind"]*factory_season_factor["wind"]["winter"])/3,
+		    "solar"::(total_factory_production["solar"]*factory_season_factor["solar"]["winter"])/3]
+	];
+    
+    //Ressources par infrastructures et par tick
+	map<string, map<string, float>> factory_ressource <- [
+	    "m² land":: ["nuclear"::1500000.0, "wind"::500.0, "hydro"::2000000.0, "solar"::20000.0],
+	    "L water":: ["nuclear"::800000.0, "wind"::50.0, "hydro"::5000000.0, "solar"::100.0]
+	];
+    
+    //Émissions par kWh (gCO2e)
+    map<string, float> emissions_per_kWh <- [
+        "nuclear"::4.0,
+        "hydro"::6.0,
+        "wind"::15.0,
+        "solar"::34.0
     ];
     
-	list<string> energys<- ["nuclear", "hydro", "wind", "solar"];
-		
+	// Coût de construction (ressources nécessaires par infrastructure)
+	map<string, map<string, float>> factory_construction_cost <- [
+	    "m3_wood":: ["nuclear"::12000.0, "wind"::45.0, "hydro"::8500.0, "solar"::5.0],
+	    "kg_cotton"::["nuclear"::500000.0, "wind"::1200.0, "hydro"::350000.0, "solar"::150.0],
+	    "m² land":: ["nuclear"::1500000.0, "wind"::500.0, "hydro"::2000000.0, "solar"::20000.0]
+	];
+	
+	map<string, float> duree_de_vie <- ["nuclear"::600.0, "hydro"::1080.0, "wind"::240.0, "solar"::300.0];
+	
+	// Parc initial
+	map<string, float> park_FR <- ["nuclear"::11, "hydro"::230, "wind"::300, "solar"::130];
+	//map<string, float> park_FR <- ["nuclear"::1, "hydro"::3, "wind"::1, "solar"::1];
+	
 	/* Consumption data */
-	map<string, int> min_kWh_conso <- ["spring":: 200, "summer"::270, "autumn"::200, "winter"::300]; // Note : this is real data
-	map<string,int> max_kWh_conso <- ["spring":: 200, "summer"::320, "autumn"::250, "winter"::400]; // Note : this is real data 
+	map<string, int> min_kWh_conso <- ["spring"::200, "summer"::270, "autumn"::200, "winter"::300];
+	map<string, int> max_kWh_conso <- ["spring"::200, "summer"::320, "autumn"::250, "winter"::400];
 	
 	/* Counters & Stats */
-	map<string, float> tick_production_E <- [];
-	map<string, float> tick_pop_consumption_E <- [];
-	map<string, float> tick_resources_used_E <- [];
-	map<string, float> tick_emissions_E <- [];
-	map<string, float> tick_stock_E <- [];
+	map<string, float> tick_production_E <- map<string, float>([]);
+	map<string, float> tick_pop_consumption_E <- map<string, float>([]);
+	map<string, float> tick_resources_used_E <- map<string, float>([]);
+	map<string, float> tick_emissions_E <- map<string, float>([]);
+	map<string, float> tick_stock_E <- ["kWh energy"::100000000000.0];
 	float tick_external_demand_E <- 0.0;
 	float surplus <- 0.0;
-	float tick_total_cons <- 0.0;
+	float marge <- 30.0;
 	float tick_consommee <- 0.0;
+	int age_tick;
 	
-	//macro
-	 map<string, float> mix_E <- ["nuclear"::0.40, "wind"::0.25, "hydro"::0.20, "solar"::0.15];
-	float terres_utilise <-4000000000.0; //4 0000km2 en m2
+	// Mix énergétique cible
+	map<string, float> mix_E <- ["nuclear"::0.40, "wind"::0.25, "hydro"::0.20, "solar"::0.15];
 	
-	
-	float land_total_E <- [];
-	
-	//Is it used ?
-	string build_energy_type <- "solar";
-    int build_quantity <- 1;
-    
-	
-	init{ // a security added to avoid launching an experiment without the other blocs
+	init{
 		if (length(coordinator) = 0){
 			error "Coordinator agent not found. Ensure you launched the experiment from the Main model";
-			// If you see this error when trying to run an experiment, this means the coordinator agent does not exist.
-			// Ensure you launched the experiment from the Main model (and not from the bloc model containing the experiment).
 		}
 	}
 }
 
-/**
- * We define here the agricultural bloc as a species.
- * We implement the methods of the API.
- * This bloc is very minimalistic : it only apply an average consumption for the population, and provide energy to other blocs.
- */
+//INFRASTRUCTURES
+
+species infrastructure {
+    string type;
+    float age <- 0.0;
+    float max_age;
+    float monthly_production <- 0.0;
+    float water_consumption <- 0.0;
+    float land_usage <- 0.0;
+    float emission_factor <- 0.0;
+    bool operational <- true;
+    rgb color <- #gray;
+    
+    reflex aging {
+        age <- age + 1.0;
+        if (age > max_age) {
+            operational <- false;
+            do die;
+        }
+    }
+    
+    float get_current_production {
+        if (!operational) {return 0.0;}
+        string saison <- current_season();
+        return factory_production[saison][type];
+    }
+    
+    float get_current_emissions {
+        if (!operational) {return 0.0;}
+        return get_current_production() * emission_factor;
+    }
+    
+    string current_season {
+        int saison_index <- cycle mod 12;
+        if(saison_index < 3) {return "spring";}
+        else if(saison_index < 6) {return "summer";}
+        else if(saison_index < 9) {return "autumn";}
+        else {return "winter";}
+    }
+    
+    aspect base {
+        draw circle(10000) color: operational ? color : #darkgray;
+    }
+}
+
+species reacteur parent: infrastructure {
+    init {
+        type <- "nuclear";
+        max_age <- duree_de_vie["nuclear"];
+        water_consumption <- factory_ressource["L water"]["nuclear"];
+        land_usage <- factory_ressource["m² land"]["nuclear"];
+        emission_factor <- emissions_per_kWh["nuclear"];
+        color <- #red;
+    }
+}
+
+species centrale_hydro parent: infrastructure {
+    init {
+        type <- "hydro";
+        max_age <- duree_de_vie["hydro"];
+        water_consumption <- factory_ressource["L water"]["hydro"];
+        land_usage <- factory_ressource["m² land"]["hydro"];
+        emission_factor <- emissions_per_kWh["hydro"];
+        color <- #blue;
+    }
+}
+
+species parc_eolien parent: infrastructure {
+    float wind_factor <- 1.0;
+    
+    init {
+        type <- "wind";
+        max_age <- duree_de_vie["wind"];
+        water_consumption <- factory_ressource["L water"]["wind"];
+        land_usage <- factory_ressource["m² land"]["wind"];
+        emission_factor <- emissions_per_kWh["wind"];
+        color <- #green;
+    }
+    
+    float get_current_production {
+        if (!operational) {return 0.0;}
+        
+        string saison <- current_season();
+        //float lat_factor <- location.x / world.shape.height;
+        //wind_factor <- 0.8 + (lat_factor * 0.4);
+        return factory_production[saison][type] * wind_factor;
+    }
+}
+
+species champ_solaire parent: infrastructure {
+    float sun_factor <- 1.0;
+    
+    init {
+        type <- "solar";
+        max_age <- duree_de_vie["solar"];
+        water_consumption <- factory_ressource["L water"]["solar"];
+        land_usage <- factory_ressource["m² land"]["solar"];
+        emission_factor <- emissions_per_kWh["solar"];
+        color <- #yellow;
+    }
+    
+    float get_current_production {
+        if (!operational) {return 0.0;}
+        
+        string saison <- current_season();
+        float lat_factor <- location.y / world.shape.height;
+        sun_factor <- 0.8 + (lat_factor * 0.4);
+        return factory_production[saison][type] * sun_factor;
+    }
+}
+
+//ENERGY
+
 species energy parent:bloc{
-	string name <- "energy";
 	
 	energy_producer producer <- nil;
 	energy_consumer consumer <- nil;
 	
-	map<string, float> n_factory<- [];
-	map<string, float> t0_n_factory<- [];
-	float land_total<- terres_utilise;
+	map<string, float> stock_E <- [];
+	string op_last_action <- nil;
+	string op_last_type <- nil;
 	
-	map<string, float> stock_E<- [];
+	list<string> get_input_resources_labels{
+		return production_inputs_E;
+	}
 	
-	action setup{
-		list<energy_producer> producers <- [];
-		list<energy_consumer> consumers <- [];
-		create energy_producer number:1 returns:producers; // instanciate the agricultural production handler
-		create energy_consumer number:1 returns:consumers; // instanciate the agricultural consumption handler
-		producer <- first(producers);
-		consumer <- first(consumers);
-		
-		//Calcul réppartition terres par rapport mix_E
-		float s <- 0.0;
-		float e <- 0.0;
-		map<string,float> land_by_type <- [];
-		loop energy_type over: energy_types {
-			s <- s + mix_E[energy_type]/total_factory_production[energy_type];
-        }
-        e <- land_total/s;
-        loop energy_type over: energy_types {
-			land_by_type[energy_type] <- (mix_E[energy_type]*e)/total_factory_production[energy_type];
-			write " energie "+ energy_type + " = "+ land_by_type[energy_type];
-        }
-		
-		
-		stock_E["kWh energy"]<- 1.0; //10 000 000 000.0
-		
-		t0_n_factory["nuclear"]<- 5;
-		t0_n_factory["hydro"]<- 10;
-		t0_n_factory["wind"]<- 100;
-		t0_n_factory["solar"]<- 10000;
-		
-		n_factory["nuclear"]<- land_by_type["nuclear"]/factory_ressource["m² land"]["nuclear"];
-		n_factory["hydro"]<- land_by_type["hydro"]/factory_ressource["m² land"]["hydro"];
-		n_factory["wind"]<- land_by_type["wind"]/factory_ressource["m² land"]["wind"];
-		n_factory["solar"]<- land_by_type["solar"]/factory_ressource["m² land"]["solar"];
-		write " n : " + n_factory["nuclear"] + " h : " + n_factory["hydro"] + " w : " + n_factory["wind"] + " s : " + n_factory["solar"];
+	list<string> get_output_resources_labels{
+		return production_outputs_E;
 	}
 	
 	action tick(list<human> pop){
@@ -166,86 +243,155 @@ species energy parent:bloc{
 		do population_activity(pop);
 	}
 	
-//	float get_land_total{
-//		return land_total;
-//	}
+	// SETUP
+	
+	action setup{
+		list<energy_producer> producers <- [];
+		list<energy_consumer> consumers <- [];
+		create energy_producer number:1 returns:producers;
+		create energy_consumer number:1 returns:consumers;
+		producer <- first(producers);
+		consumer <- first(consumers);
+		
+		stock_E["kWh energy"] <- 1.0;
+		
+		float total_land_needed <- 0.0;
+		loop energy_type over: energy_types {
+			total_land_needed <- total_land_needed + (park_FR[energy_type] * factory_construction_cost["m² land"][energy_type]);
+		}
+		
+		if (producer.ext_producers contains_key "m² land") {
+			bool land_ok <- producer.ext_producers["m² land"].producer.produce(["m² land"::total_land_needed]);
+		}
+		
+		//Les species au lancement
+		create reacteur number: park_FR["nuclear"] {
+			location <- any_location_in(one_of(fronteers));
+			age <- rnd(max_age);
+		}
+		
+		create centrale_hydro number: park_FR["hydro"] {
+			/* 
+	          if (!empty(water_source)) {
+	            location <- any_location_in(one_of(water_source));
+			} else {
+				location <- any_location_in(one_of(fronteers));
+			}*/
+			location <- any_location_in(one_of(fronteers));
+			age <- rnd(max_age);
+		}
+		
+		create parc_eolien number: park_FR["wind"] {
+			location <- any_location_in(one_of(fronteers));
+			age <- rnd(max_age);
+			wind_factor <- 0.8 + rnd(0.4);
+		}
+		
+		create champ_solaire number: park_FR["solar"] {
+			location <- any_location_in(one_of(fronteers));
+			age <- rnd(max_age);
+			sun_factor <- 0.9 + rnd(0.2);
+		}
+		
+		tick_production_E["kWh energy"] <- 0.0;
+		tick_emissions_E["Total"] <- 0.0;
+		tick_resources_used_E["L water"] <- 0.0;
+		tick_resources_used_E["m² land"] <- 0.0;
+		
+		loop energy_type over: energy_types {
+			tick_production_E[energy_type] <- 0.0;
+			tick_emissions_E[energy_type] <- 0.0;
+		}
+		
+		write "Parc initial créé :";
+		write "  - Nucléaire: " + length(reacteur);
+		write "  - Hydroélectrique: " + length(centrale_hydro);
+		write "  - Éolien: " + length(parc_eolien);
+		write "  - Solaire: " + length(champ_solaire);
+	}
 	
 	map<string, float> get_stock_E{
 		return stock_E;
 	}
 	
+	//unused, on fait directement stock = stock + prod
+	action set_stock_E(float s){
+		stock_E["kWh energy"] <- s;
+	}
 	
 	production_agent get_producer{
-		write "producer inside target bloc : "+producer;
 		return producer;
 	}
-
-	list<string> get_output_resources_labels{
-		return production_outputs_E;
+	
+	string current_season{
+		int saison_index <- cycle mod 12;
+		if(saison_index < 3) {return "spring";}
+		else if(saison_index < 6) {return "summer";}
+		else if(saison_index < 9) {return "autumn";}
+		else {return "winter";}
 	}
 	
-	list<string> get_input_resources_labels{
-		return production_inputs_E;
+	map<string, float> get_production_by_type{
+		map<string, float> production <- [];
+		
+		production["nuclear"] <- sum(reacteur collect (each.get_current_production()));
+		production["hydro"] <- sum(centrale_hydro collect (each.get_current_production()));
+		production["wind"] <- sum(parc_eolien collect (each.get_current_production()));
+		production["solar"] <- sum(champ_solaire collect (each.get_current_production()));
+		
+		return production;
 	}
 	
-	action set_stock_E(float stock){
-		stock_E["kWh energy"] <- stock;
+	map<string, float> get_current_mix{
+		map<string, float> current_mix <- [];
+		map<string, float> production <- get_production_by_type();
+		
+		float total_prod <- 0.0;
+		loop energy_type over: energy_types {
+			total_prod <- total_prod + production[energy_type];
+		}
+		
+		if (total_prod > 0.0) {
+			loop energy_type over: energy_types {
+				current_mix[energy_type] <- production[energy_type] / total_prod;
+			}
+		} else {
+			loop energy_type over: energy_types {
+				current_mix[energy_type] <- 0.0;
+			}
+		}
+		
+		return current_mix;
 	}
 	
-	map<string, float> get_n_factory {
-        return copy(n_factory);
-    }
-    
-    map<string, float> get_production_by_type {
-        map<string, float> production <- [];
-        string saison;
-       	int saison_index <- cycle mod 12;
-			if(saison_index < 3){saison <- "spring";}
-			else if(saison_index < 6){saison <- "summer";}
-			else if(saison_index < 9){saison <- "autumn";}
-			else if(saison_index < 12){saison <- "winter";}
-        loop energy_type over: energy_types {
-            production[energy_type] <- n_factory[energy_type] * factory_production[saison][energy_type] * factory_ressource["m² land"][energy_type];
-        }
-        return production;
-    }
-    
-    map<string, float> get_pollution_by_type {
-        map<string, float> pollution <- [];
-		string saison;
-       	int saison_index <- cycle mod 12;
-			if(saison_index < 3){saison <- "spring";}
-			else if(saison_index <6){saison <- "summer";}
-			else if(saison_index < 9){saison <- "autumn";}
-			else if(saison_index < 12){saison <- "winter";}
-        loop energy_type over: energy_types {
-            pollution[energy_type] <- n_factory[energy_type] * factory_production[saison][energy_type] * factory_ressource["m² land"][energy_type] * emissions_per_kWh[energy_type];
-        }
-        return pollution;
-    }
-    
-    //A MODIFIER loop over input
-    map<string,map<string, float>> get_ressource_by_type {
-    	//factory_ressource
-        map<string,map<string, float>> resources <- [];
-        // Initialiser les sous-maps
-   	 	resources["L water"] <- map<string, float>([]);
-    	resources["m² land"] <- map<string, float>([]);
-    	
-		string saison;
-       	int saison_index <- cycle mod 12;
-			if(saison_index < 3){saison <- "spring";}
-			else if(saison_index <6){saison <- "summer";}
-			else if(saison_index < 9){saison <- "autumn";}
-			else if(saison_index < 12){saison <- "winter";}
-        loop energy_type over: energy_types {
-            resources["L water"][energy_type] <- n_factory[energy_type] * factory_production[saison][energy_type]* factory_ressource["L water"][energy_type];
-            resources["m² land"][energy_type] <- n_factory[energy_type] * factory_production[saison][energy_type]* factory_ressource["m² land"][energy_type];
-        }
-        write " ressources = "+ resources;
-        return resources;
-    }
-
+	map<string, float> get_pollution_by_type{
+		map<string, float> pollution <- [];
+		
+		pollution["nuclear"] <- sum(reacteur collect (each.get_current_emissions()));
+		pollution["hydro"] <- sum(centrale_hydro collect (each.get_current_emissions()));
+		pollution["wind"] <- sum(parc_eolien collect (each.get_current_emissions()));
+		pollution["solar"] <- sum(champ_solaire collect (each.get_current_emissions()));
+		
+		return pollution;
+	}
+	
+	map<string, float> get_resources_usage{
+		map<string, float> resources <- ["L water"::0.0, "m² land"::0.0];
+		
+		resources["L water"] <- resources["L water"] + sum(reacteur collect (each.water_consumption));
+		resources["L water"] <- resources["L water"] + sum(centrale_hydro collect (each.water_consumption));
+		resources["L water"] <- resources["L water"] + sum(parc_eolien collect (each.water_consumption));
+		resources["L water"] <- resources["L water"] + sum(champ_solaire collect (each.water_consumption));
+		
+		resources["m² land"] <- resources["m² land"] + sum(reacteur collect (each.land_usage));
+		resources["m² land"] <- resources["m² land"] + sum(centrale_hydro collect (each.land_usage));
+		resources["m² land"] <- resources["m² land"] + sum(parc_eolien collect (each.land_usage));
+		resources["m² land"] <- resources["m² land"] + sum(champ_solaire collect (each.land_usage));
+		
+		return resources;
+	}
+	
+	//Action
 	
 	action set_external_producer(string product, bloc bloc_agent){
 		ask producer{
@@ -254,328 +400,459 @@ species energy parent:bloc{
 	}
 	
 	action collect_last_tick_data{
-		if(cycle > 0){ // skip it the first tick
-			tick_pop_consumption_E <- consumer.get_tick_consumption(); // collect consumption behaviors
-    		tick_resources_used_E <- producer.get_tick_inputs_used(); // collect resources used
-	    	tick_production_E <- producer.get_tick_outputs_produced(); // collect production
-	    	tick_emissions_E <- producer.get_tick_emissions(); // collect emissions
-	    	
-	    	//land_total <- get_land_total();
+		if(cycle > 0){
+			tick_pop_consumption_E <- consumer.get_tick_consumption();
+    		tick_resources_used_E <- producer.get_tick_inputs_used();
+	    	tick_production_E <- producer.get_tick_outputs_produced();
+	    	tick_emissions_E <- producer.get_tick_emissions();
 	    	stock_E <- get_stock_E();
     	
-	    	ask energy_consumer{ // prepare next tick on consumer side
+	    	ask energy_consumer{
 	    		do reset_tick_counters;
 	    	}
-	    	
-	    	ask energy_producer{ // prepare next tick on producer side
+	    	ask energy_producer{
 	    		do reset_tick_counters;
 	    	}
     	}
 	}
 	
-	action population_activity(list<human> pop) {
-    	ask pop{ // execute the consumption behavior of the population
-    		ask energy_consumer{ // utiliser directement energy_consumer
-    			do consume(myself); // individuals consume agricultural goods
+	action population_activity(list<human> pop){
+		do optimize_park();
+    	ask pop{
+    		ask energy_consumer{
+    			do consume(myself);
     		}
     	}
-    	 
-    	ask energy_consumer{ // produce the resuired quantities
+    	
+    	ask energy_consumer{
     		ask energy_producer{
     			do stock_update();
     			loop c over: myself.consumed.keys{
 		    		do produce([c::myself.consumed[c]]);
 		    	}
-		    } 
+		    }
     	}
     }
-    //CONSTRUIRE PLUS !
-    action build_infrastructure(string energy_type, int quantity) {
-	    // Vérifier les ressources nécessaires
-	    map<string, float> total_cost <- (map<string, float>([]));
-	    
-	    loop material over: factory_construction_cost.keys {
-	        total_cost[material] <- factory_construction_cost[material][energy_type] * quantity;
+    
+    //Regarde si on peut construire puis construit
+	action build_infrastructure(string energy_type, int quantity) {
+	    loop mat over: ["m3_wood", "kg_cotton", "m² land"] {
+	        float cost <- factory_construction_cost[mat][energy_type] * quantity;
 	        
-	        // Vérifier si on a assez de ressources
-	        // (Vous devrez ajouter un stock de ressources à votre espèce energy)
-	        if (stock[material] < total_cost[material]) {
-	            write "Pas assez de " + material + " pour construire " + quantity + " " + energy_type + " usines";
-	            return;
+	        if (not(producer.ext_producers contains_key mat) or 
+	            not(producer.ext_producers[mat].producer.produce([mat::cost]))) {
+	            return; 
 	        }
 	    }
 	    
-	    // Déduire les ressources
-	    loop material over: total_cost.keys {
-	        stock[material] <- stock[material] - total_cost[material];
+	    //Création d'infrastructures
+	    if (energy_type = "nuclear") {
+	        create reacteur number: quantity {
+	            location <- any_location_in(one_of(fronteers));
+	            age <- 0.0;
+	        }
+	    } else if (energy_type = "hydro") {
+	        create centrale_hydro number: quantity {
+	        	/*
+	            if (!empty(water_source)) {
+	                location <- any_location_in(one_of(water_source));
+	            } else {
+	                location <- any_location_in(one_of(fronteers));
+	            } */
+	            location <- any_location_in(one_of(fronteers));
+	            age <- 0.0;
+	        }
+	    } else if (energy_type = "wind") {
+	        create parc_eolien number: quantity {
+	            location <- any_location_in(one_of(fronteers));
+	            age <- 0.0;
+	            wind_factor <- 0.8 + rnd(0.4);
+	        }
+	    } else if (energy_type = "solar") {
+	        create champ_solaire number: quantity {
+	            location <- any_location_in(one_of(fronteers));
+	            age <- 0.0;
+	            sun_factor <- 0.9 + rnd(0.2); // A modifier
+	        }
+	    }
+	}
+	
+	action count_surplus{
+		surplus <- tick_production_E["kWh energy"] - tick_external_demand_E; //BIG modif
+	}
+	
+	//On désactive l'usine la plus vieille 
+	action remove_oldest_factory(string energy_type) {
+	    list<infrastructure> candidates <- [];
+	    
+	    if (energy_type = "nuclear") { candidates <- reacteur select (each.operational); }
+	    else if (energy_type = "hydro") { candidates <- centrale_hydro select (each.operational); }
+	    else if (energy_type = "wind") { candidates <- parc_eolien select (each.operational); }
+	    else if (energy_type = "solar") { candidates <- champ_solaire select (each.operational); }
+	    
+	    if (length(candidates) = 0) {
+	        return;
+	    }
+	    infrastructure oldest <- candidates with_max_of (each.age);
+	    ask oldest {
+	        operational <- false;
+	    }
+	}
+	
+	// On réactive l'usine la plus jeune
+	bool re_use_factory(string energy_type) {
+	    list<infrastructure> unused <- [];
+	    
+	    if (energy_type = "nuclear") {unused <- reacteur select (not each.operational);}
+	    else if (energy_type = "hydro") { unused <- centrale_hydro select (not each.operational);}
+	    else if (energy_type = "wind") { unused <- parc_eolien select (not each.operational);}
+	    else if (energy_type = "solar") { unused <- champ_solaire select (not each.operational);}
+	    
+	    if (length(unused) = 0) {
+	        return false;
+	    }
+	    infrastructure youngest <- unused with_min_of (each.age);
+	    ask youngest {
+	        operational <- true;
+	    }
+	    return true;
+	}
+	
+	// Construction/Destruction d'usines pour se rapprocher du mixeE
+	action optimize_park {
+	    float xsurplus <- surplus;
+	    
+	    // Paramètres
+	    float TARGET_SURPLUS <- 1.5e7;
+	    float STABLE_BAND <- 3.0e7;
+	    
+	    //Nombre d'infrastructures min
+	    map<string,int> min_capacity <- [
+	        "nuclear" :: 1,
+	        "hydro" :: 1,
+	        "wind" :: 1,
+	        "solar" :: 1
+	    ];
+	    
+	    //Nombre d'usines modifié max
+	    map<string,int> batch_size <- [
+	        "nuclear" :: 1,
+	        "hydro" :: 26,
+	        "wind" :: 30,
+	        "solar" :: 13
+	    ];
+	    
+	    write "surplus=" + xsurplus;
+	    if (abs(xsurplus - TARGET_SURPLUS) <= STABLE_BAND) {
+	        return;
+	    }
+	    map<string, float> current_mix <- get_current_mix();
+	    
+	    write "Mix actuel:";
+	    loop energy_type over: energy_types {
+	        write "  " + energy_type + ": " + (current_mix[energy_type] * 100.0) + "% (cible: " + (mix_E[energy_type] * 100.0) + "%)";
 	    }
 	    
-	    // Ajouter les usines
-	    n_factory[energy_type] <- n_factory[energy_type] + quantity;
+	    //Sous production => On construit des usines
+	    if (xsurplus < TARGET_SURPLUS - STABLE_BAND) {
+	        
+	        if (op_last_action = "destroy") {
+	            return;
+	        }
+	        
+	        //Trouver le type avec le plus grand écart négatif
+	        string type_to_build <- nil;
+	        float max_deficit <- 0.0;
+	        
+	        loop energy_type over: energy_types {
+	            float deficit <- mix_E[energy_type] - current_mix[energy_type];
+	            if (deficit > max_deficit) {
+	                max_deficit <- deficit;
+	                type_to_build <- energy_type;
+	            }
+	        }
+	        
+	        if (type_to_build = nil) {
+	            type_to_build <- "solar";
+	        }
+	        
+	        int batch <- batch_size[type_to_build];
+	        int reused <- 0;
+	        int built <- 0;
+	        
+	        loop times: batch {
+	            if (re_use_factory(type_to_build)) {
+	                reused <- reused + 1;
+	            } else {
+	                do build_infrastructure(type_to_build, 1);
+	                built <- built + 1;
+	            }
+	        }
+	        op_last_action <- "build";
+	        op_last_type <- type_to_build;
+	        return;
+	    }
 	    
-	    write " "+quantity + " nouvelle(s) usine(s) " + energy_type + " construite(s) !";
+	    //Sur production => On désactive des usines
+	    if (xsurplus > TARGET_SURPLUS + STABLE_BAND) {
+	        
+	        if (op_last_action = "build") {
+	            return;
+	        }
+	        
+	        //Trouver le type avec le plus grand écart mixeE/mixe réel
+	        string type_to_reduce <- nil;
+	        float max_excess <- 0.0;
+	        
+	        loop energy_type over: energy_types {
+	            float excess <- current_mix[energy_type] - mix_E[energy_type];
+	            
+	            //Verifier qu'on peut détruire
+	            int current_count <- 0;
+	            if (energy_type = "nuclear") { current_count <- length(reacteur select (each.operational)); }
+	            else if (energy_type = "hydro") { current_count <- length(centrale_hydro select (each.operational)); }
+	            else if (energy_type = "wind") { current_count <- length(parc_eolien select (each.operational)); }
+	            else if (energy_type = "solar") { current_count <- length(champ_solaire select (each.operational)); }
+	            
+	            if (excess > max_excess and current_count > min_capacity[energy_type]) {
+	                max_excess <- excess;
+	                type_to_reduce <- energy_type;
+	            }
+	        }
+	        
+	        if (type_to_reduce != nil) {
+	            int batch <- batch_size[type_to_reduce];
+	            
+	            loop times: batch {
+	                do remove_oldest_factory(type_to_reduce);
+	            }
+	            
+	            write "REDUCE " + type_to_reduce + " (excès=" + (max_excess*100.0) + "%): removed=" + batch;
+	            op_last_action <- "destroy";
+	            op_last_type <- type_to_reduce;
+	        }
+	    }
 	}
 }
 
-	/**
-	 * We define here the production agent of the energy bloc as a micro-species (equivalent of nested class in Java).
-	 * We implement the methods of the API.
-	 * The production is minimalistic here : we apply an average resource consumption and emissions for the energy production.
-	 */
-	species energy_producer parent:production_agent{
-		map<string, float> tick_resources_used <- (map<string, float>([]));
-		map<string, float> tick_production <- (map<string, float>([]));
-		map<string, float> tick_emissions <- (map<string, float>([]));
-		float tick_external_demand;
-		
-		map<string, bloc> ext_producers <- [];
-		
-		//GETTER
-		map<string, float> get_tick_inputs_used{
-			return tick_resources_used;
-		}
-		
-		map<string, float> get_tick_outputs_produced{
-			return tick_production;
-		}
-		
-		map<string, float> get_tick_emissions{
-			return tick_emissions;
-		}
-		
-		float get_tick_external_demand{
-			return tick_external_demand;
-		}
-		
-		//SETTER
-		action set_tick_resources_used(map<string, float> new_resources) {
-			tick_resources_used["m² land"] <- new_resources["m² land"];
-			tick_resources_used["L water"] <- new_resources["L water"];
-	    }
-	    action set_tick_production(map<string, float> new_resources) {
-	        tick_production <- new_resources;
-	    }
-	    action set_tick_emissions(map<string, float> new_resources) {
-	        tick_emissions <- new_resources;
-	    }
-	    
-	    action add_tick_external_demand(float add_demand){
-	    	tick_external_demand <- tick_external_demand + add_demand;
-	    }
+//ENERGY PRODUCER
+species energy_producer parent:production_agent{
 	
-		//RESET
-		action reset_tick_counters{ // reset impact counters
-			loop u over: production_inputs_E{
-				tick_resources_used[u] <- 0.0; // reset resources usage
-			}
-			loop p over: production_outputs_E{
-				tick_production[p] <- 0.0; // reset productions
-			}
-			loop e over: production_emissions_E{
-				tick_emissions[e] <- 0.0;
-			}
-			tick_external_demand_E <- 0.0;
-			tick_consommee <- 0.0;
+	map<string, float> tick_resources_used <- map<string, float>([]);
+	map<string, float> tick_production <- map<string, float>([]);
+	map<string, float> tick_emissions <- map<string, float>([]);
+	
+	map<string, bloc> ext_producers <- [];
+	
+	//GETTER
+	map<string, float> get_tick_inputs_used{
+		return copy(tick_resources_used);
+	}
+	
+	map<string, float> get_tick_outputs_produced{
+		return copy(tick_production);
+	}
+	
+	map<string, float> get_tick_emissions{
+		return copy(tick_emissions);
+	}
+	
+	//SETTER
+	action set_tick_resources_used(map<string, float> new_resources){
+		tick_resources_used["m² land"] <- new_resources["m² land"];
+		tick_resources_used["L water"] <- new_resources["L water"];
+    }
+    
+    action set_tick_production(map<string, float> new_resources){
+        tick_production <- new_resources;
+    }
+    
+    action set_tick_emissions(map<string, float> new_resources){
+        tick_emissions <- new_resources;
+    }
+	
+	//RESET
+	action reset_tick_counters{
+		tick_production["kWh energy"] <- 0.0;
+		tick_external_demand_E <- 0.0;
+		tick_consommee <- 0.0;
+		
+		loop energy_type over: energy_types {
+			tick_production[energy_type] <- 0.0;
+			tick_emissions[energy_type] <- 0.0;
 		}
 		
-		action count_graph{
-			loop c over: production_outputs_E{
-				tick_total_cons <- tick_external_demand_E + tick_pop_consumption_E[c];
+		tick_emissions["Total"] <- 0.0;
+		tick_resources_used["L water"] <- 0.0;
+		tick_resources_used["m² land"] <- 0.0;
+		
+		loop c over: production_outputs_E {
+			tick_pop_consumption_E[c] <- 0;
+		}
+	}
+	
+	//PRODUCE
+	bool produce(map<string, float> demand){
+		bool ok <- true;
+		
+		loop product over: demand.keys {
+			if (product = "kWh energy"){
+				tick_external_demand_E <- tick_external_demand_E + demand[product];
 			}
-			surplus <- tick_production_E["kWh energy"] - tick_total_cons;
 		}
 		
-		//PRODUCE
-		bool produce(map<string,float> demand){ // apply the input
-		
-			bool ok <- true;
-			loop energy_type over: demand.keys{
-				ask energy{
-					tick_external_demand_E <- tick_external_demand_E + demand[energy_type];
-					//write "neeeeddddsssss"+"  "+ demand+ demand.keys +"combien"+ demand[energy_type]+"/////"+stock_E[energy_type];
-					if(demand[energy_type] > stock_E[energy_type]){
-						ok <- false;
-					}
-				}
-			}
-			
-			if(ok){
-				loop energy_type over: demand.keys {
-					ask energy {
-						//write "Energy - Demand External" +demand[energy_type];
-						//write "stock" +stock_E[energy_type];
-						//write "nee222222" + demand+ demand.keys +"combien"+ demand[energy_type]+"/////"+stock_E[energy_type];
-						stock_E[energy_type] <- stock_E[energy_type] - demand[energy_type];
-						tick_consommee <- tick_consommee + demand[energy_type];
-						//write "Energy - Stock" +stock_E[energy_type];
-					}
-				}
-			}
-			do count_graph();
-			//write "STATS"+tick_production["kWh energy"] +tick_resources_used["L water"] +tick_emissions_E["gCO2e emissions"];
-			return ok;		        
-		}
-		
-		action stock_update{ // rajoute de l'energie a notre stock en récuperant l'eau des autres
-			
-			
-			map<string, float> prod <- (map<string, float>([]));
-		    map<string, float> poll <- (map<string, float>([]));
+		loop product over: demand.keys {
 			ask energy {
-		
-					stock_E["kWh energy"] <- 0.0;
-					
-		            map<string, float> production_by_type <- get_production_by_type();
-		            map<string, float> pollution_by_type <- get_pollution_by_type();
-
-		            loop energy_type over: energy_types {
-		                prod[energy_type] <- production_by_type[energy_type];
-		                poll[energy_type] <- pollution_by_type[energy_type];
-		            }
-		            
-		            //le total en kWh
-		            float total_kWh <- 0.0;
-		            float total_pollution <- 0.0;
-		            loop energy_type over: energy_types {
-		                total_kWh <- total_kWh + production_by_type[energy_type];
-		                total_pollution <- total_pollution + pollution_by_type[energy_type];
-		            }
-		            prod["kWh energy"] <- total_kWh; //total energies
-		            poll["Total"] <- total_pollution;
-
-		        }
-		        
-		    map<string, float> ress <- ["L water"::0.0, "m² land"::0.0];
-		    ask energy{
-		    	map<string, float> all_factory <- get_n_factory();
-			    loop energy_type over: energy_types {
-	                        //ress["L water"] <- ress["L water"] + (all_factory[energy_type] * factory_ressource["L water"][energy_type]);
-	                        ress["m² land"] <- ress["m² land"] + (all_factory[energy_type] * factory_ressource["m² land"][energy_type]);
-	            }
-		    }
-		        
-		 	float total_water;
-		 	loop energy_type over: energy_types {
-		 		total_water <- total_water + production_inputs_per_kWh[energy_type]["L water"] * prod[energy_type];
-		 	}
-		 
-		 	bool av <- ext_producers["L water"].producer.produce(["L water"::total_water]);
-		 	if(av){
-		 		ask energy{
-		 			stock_E["kWh energy"] <- stock_E["kWh energy"] + prod["kWh energy"];
-		 			//write stock_E["kWh energy"];
-		 		}
-		 		
-		 		//write "tick prod"+tick_production["kWh energy"];
-		 		tick_production["kWh energy"] <- tick_production["kWh energy"] + prod["kWh energy"];
-		 		//write "tick prod"+tick_production["kWh energy"];
-		 		tick_resources_used["L water"] <- tick_resources_used["L water"] + total_water;
-		 		ress["L water"] <- ress["L water"] + total_water;
-		 		tick_emissions["gCO2e emissions"] <- tick_emissions["gCO2e emissions"] + poll["Total"];
-		 		
-		 		do set_tick_production(prod);
-		 		do set_tick_resources_used(ress);
-		 		//write "prod"+prod;
-		   		do set_tick_emissions(poll);
-		   		
-		 		
-		 		//write "E - Production succeed."+ tick_production["kWh energy"];
-		 	}else{
-		 		//write "E - Production failed.";
-		 	}
-		}
-		
-		//SUPPLY
-		action set_supplier(string product, bloc bloc_agent){
-			write name+" demande "+product+" à "+bloc_agent;
-			ext_producers[product] <- bloc_agent;
-		}
-	
-	}
-	
-	/**
-	 * We define here the conumption agent of the energy bloc as a micro-species (equivalent of nested class in Java).
-	 * We implement the methods of the API.
-	 * The consumption is minimalistic here : we apply a random energy consumption for everyone.
-	 */
-	species energy_consumer parent:consumption_agent{
-	
-		map<string, float> consumed <- [];
-		
-		map<string, float> get_tick_consumption{
-			return copy(consumed);
-		}
-		
-		init{
-			loop c over: production_outputs_E{
-				consumed[c] <- 0;
+				if(demand[product] > stock_E[product]) {
+					ok <- false;
+				}
 			}
 		}
 		
-		action reset_tick_counters{ // reset choices counters
-    		loop c over: consumed.keys{
-    			consumed[c] <- 0;
-    		}
+		if(ok) {
+			loop product over: demand.keys {
+				ask energy {
+					stock_E[product] <- stock_E[product] - demand[product];
+					tick_consommee <- tick_consommee + demand[product];
+				}
+			}
 		}
 		
-		action consume(human h){
-			string saison;
-       	int saison_index <- cycle mod 12;
-			if(saison_index < 3){saison <- "spring";}
-			else if(saison_index <6){saison <- "summer";}
-			else if(saison_index < 9){saison <- "autumn";}
-			else if(saison_index < 12){saison <- "winter";}
-		    string choice <- one_of(production_outputs_E); // note : here, there is only one production, energy
-			consumed[choice] <- consumed[choice]+rnd(min_kWh_conso[saison], max_kWh_conso[saison]); // monthly consume a random amount of energy 
+		ask energy {
+			do count_surplus();
+		}
+		
+		return ok;
+	}
+	
+	action stock_update{
+		map<string, float> prod <- map<string, float>([]);
+	    map<string, float> poll <- map<string, float>([]);
+	    
+		ask energy {
+			
+            map<string, float> production_by_type <- get_production_by_type();
+            map<string, float> pollution_by_type <- get_pollution_by_type();
+
+            loop energy_type over: energy_types {
+                prod[energy_type] <- production_by_type[energy_type];
+                poll[energy_type] <- pollution_by_type[energy_type];
+            }
+            
+            float total_kWh <- 0.0;
+            float total_pollution <- 0.0;
+            loop energy_type over: energy_types {
+                total_kWh <- total_kWh + production_by_type[energy_type];
+                total_pollution <- total_pollution + pollution_by_type[energy_type];
+            }
+            stock_E["kWh energy"] <- stock_E["kWh energy"] + total_kWh;
+            prod["kWh energy"] <- total_kWh;
+            poll["Total"] <- total_pollution;
+        }
+        
+	    map<string, float> ress <- map<string, float>([]);
+
+	    ask energy {
+		    ress <- get_resources_usage();
+	    }
+	 	bool av <- ext_producers["L water"].producer.produce(["L water"::ress["L water"]]);
+	 	
+	 	if(av) {
+	 		ask energy {
+	 			stock_E["kWh energy"] <- stock_E["kWh energy"] + prod["kWh energy"];
+	 		}
+	 		
+	 		tick_production["kWh energy"] <- tick_production["kWh energy"] + prod["kWh energy"];
+	 		tick_resources_used["L water"] <- tick_resources_used["L water"] + ress["L water"];
+	 		tick_resources_used["m² land"] <- tick_resources_used["m² land"] + ress["m² land"];
+	 		tick_emissions["gCO2e emissions"] <- tick_emissions["gCO2e emissions"] + poll["Total"];
+	 		
+	 		do set_tick_production(prod);
+	 		do set_tick_resources_used(ress);
+	   		do set_tick_emissions(poll);
+	 	}
+	}
+	
+	action set_supplier(string product, bloc bloc_agent){
+		ext_producers[product] <- bloc_agent;
+	}
+}
+
+//ENERGY CONSUMER 
+
+species energy_consumer parent:consumption_agent{
+
+	map<string, float> consumed <- [];
+	
+	map<string, float> get_tick_consumption{
+		return copy(consumed);
+	}
+	
+	init{
+		loop c over: production_outputs_E {
+			consumed[c] <- 0;
 		}
 	}
+	
+	action reset_tick_counters{
+		loop c over: consumed.keys {
+			consumed[c] <- 0;
+		}
+	}
+	
+	action consume(human h){
+		string saison;
+		ask energy {
+			saison <- current_season();
+		}
+		
+	    string choice <- one_of(production_outputs_E);
+		consumed[choice] <- consumed[choice] + rnd(min_kWh_conso[saison], max_kWh_conso[saison]);
+	}
+}
 
+//AFFICHAGE
 
-/**
- * We define here the experiment and the displays related to energy. 
- * We will then be able to run this experiment from the Main code of the simulation, with all the blocs connected.
- * 
- * Note : experiment car inherit another experiment, but we can't combine displays from multiple experiments at the same time. 
- * If needed, a new experiment combining all those displays should be added, for example in the Main code of the simulation.
- */
 experiment run_energy type: gui {
-
     
     output {
 		display Energy_information {
-			chart "Ecart Production / Consommation" type: series  size: {0.5,0.5} position: {0, 0} {
-			    //loop c over: production_outputs_E{
-			    	//data "Pop conso "+c value: tick_pop_consumption_E[c]; // note : products consumed by other blocs NOT included here (only population direct consumption)
-			    //}
-			    data "Demande" value: tick_external_demand_E color: #black;
-			    data "Consommation" value: tick_consommee color: #blue;
+			chart "Écart Production / Consommation" type: series size: {0.5, 0.5} position: {0, 0} {
+			    data "Demande externe" value: tick_external_demand_E color: #black;
+			    data "Consommation totale" value: tick_consommee color: #blue;
 			    data "Production" value: tick_production_E["kWh energy"] color: #green;
-			    data "Différence" value: surplus color: #red;
+			    data "Surplus" value: surplus color: #red;
 			}
-			chart "Production par type d'énergie (kWh)" type: series  size: {0.5,0.5} position: {0.5, 0} {
+			
+			chart "Production par type (kWh)" type: series size: {0.5, 0.5} position: {0.5, 0} {
 			    data "Nucléaire" value: tick_production_E["nuclear"] color: #red;
 			    data "Hydroélectrique" value: tick_production_E["hydro"] color: #blue;
 			    data "Éolien" value: tick_production_E["wind"] color: #green;
 			    data "Solaire" value: tick_production_E["solar"] color: #yellow;
-			    
 			    data "Total" value: tick_production_E["kWh energy"] color: #black;
 			}
-			chart "Resources usage" type: series size: {0.5,0.5} position: {0, 0.5} {
-				data "m² land" value: tick_resources_used_E["m² land"] color: #green;
-				data "L water" value: tick_resources_used_E["L water"] color: #blue;
-			    loop r over: production_inputs_E{
-			    	data r value: tick_resources_used_E[r];
-			    }
-			    
+			
+			chart "Ressources utilisées" type: series size: {0.5, 0.5} position: {0, 0.5} {
+				data "Terre (m²)" value: tick_resources_used_E["m² land"] color: #brown;
+				data "Eau (L)" value: tick_resources_used_E["L water"] color: #blue;
 			}
-			chart "Production emissions" type: series size: {0.5,0.5} position: {0.5, 0.5} {
+			
+			chart "Émissions (gCO2e)" type: series size: {0.5, 0.5} position: {0.5, 0.5} {
 			    data "Nucléaire" value: tick_emissions_E["nuclear"] color: #red;
 			    data "Hydroélectrique" value: tick_emissions_E["hydro"] color: #blue;
 			    data "Éolien" value: tick_emissions_E["wind"] color: #green;
 			    data "Solaire" value: tick_emissions_E["solar"] color: #yellow;
-			    
 			    data "Total" value: tick_emissions_E["Total"] color: #black;
 			}
+	    }
+	    
+	    display Energy_map type: java2D {
+	        species fronteers aspect: base;
+	        species water_source aspect: base transparency: 0.3;
+	        species reacteur aspect: base;
+	        species centrale_hydro aspect: base;
+	        species parc_eolien aspect: base;
+	        species champ_solaire aspect: base;
 	    }
 	}
 }
