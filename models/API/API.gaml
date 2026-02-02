@@ -240,47 +240,6 @@ species water_source {
 //}
 
 /*
- * Species used for the generation of cities and mini-cities
- */
-species cities {
-	file shape_file_cities;
-	geometry shape;
-	// Parameters for city generation asked to user :
-	int population_size; // number of people in the simulation
-	int number_of_mini_cities; // number of mini-cities
-	int city_population; // number of people per constellations of mini-cities
-	int number_of_cities;
-	int nb_mini_cities_per_city;
-	int mini_city_population <- 10000; // population of a mini-city (10000 by default according to CDC)
-	list<mini_city> mini_cities; // list of all mini-cities
-	list<main_city> main_cities; // list of all main-cities
-	float mini_city_distance_from_center <- 5.0 #km;
-
-	action generate_cities {
-		write(city_population);
-		// 1. create cities (mini-city constellations)
-		create main_city from: shape_file_cities with: [city_name::read("name"), city_population::city_population];
-		main_cities <- list(main_city);
-		number_of_cities <- length(main_city);
-		nb_mini_cities_per_city <- int(city_population / mini_city_population);
-
-		// 2. create mini-cities around each constellations
-		ask main_city {
-			do generate_mini_cities(myself.nb_mini_cities_per_city, myself.mini_city_distance_from_center, myself.mini_city_population);
-		}
-		mini_cities <- list(mini_city);
-	}
-
-	list<mini_city> get_mini_cities {
-		return mini_cities;
-	}
-
-	list<main_city> get_main_cities {
-		return main_cities;
-	}
-}
-
-/*
  * Species of a main_city representing a main city of France (one of the cities given in the file 'cities_france.shp'
  * It serves as a point of reference for the placement of a constellations of mini-cities around it 
  */
@@ -288,29 +247,7 @@ species main_city {
 	string city_name;
 	int city_population <- 0;
 	list<mini_city> mini_cities_list;
-
-	action generate_mini_cities (int nb_mini_cities_per_city, float mini_city_distance_from_center, int mini_city_population) {
-		loop i from: 0 to: nb_mini_cities_per_city - 1 {
-			// Calculate the position for GIS
-			// Angle evenly spaced around the center 
-			// TODO : changer le placement des villes pour un placement aléatoire dans un rayon
-			float angle <- i * (360.0 / nb_mini_cities_per_city);
-			// Position with small random noise
-			float distance <- mini_city_distance_from_center * (0.8 + rnd(0.4));
-			float angle_noise <- angle + rnd(-15.0, 15.0);
-			point offset <- {distance * cos(angle_noise), distance * sin(angle_noise)};
-			point mini_city_location <- location + offset;
-			
-			create mini_city {
-				mini_city_name <- myself.city_name + "_MC" + i;
-				location <- mini_city_location;
-				parent_city <- myself; //reference to its parent
-				radius <- 1 #km; // radius of mini-cities
-				pop <- mini_city_population;
-				add self to: myself.mini_cities_list;
-			}
-		}
-	}
+	
 	// --- GIS
 	aspect base {
 		draw circle(1000) color: #darkgray border: #black;
