@@ -875,7 +875,7 @@ experiment run_agricultural type: gui {
 			}
 			
 			chart "Resources usage" type: series size: {0.5, 0.5} position: {0.5, 0.5} {
-				data "kL water (1000 L)" value: tick_resources_used_A["L water"]/1000 color:#skyblue;
+				data "L water" value: tick_resources_used_A["L water"] color:#skyblue;
 				data "kWh energy" value: tick_resources_used_A["kWh energy"] color:#orange;
 				data "m² land" value: tick_resources_used_A["m² land"] color:#pink;
 
