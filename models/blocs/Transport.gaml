@@ -43,6 +43,7 @@ global {
 	map<string, float> tick_pop_consumption_T <- [];
 	map<string, float> tick_resources_used_T <- [];
 	map<string, float> tick_emissions_T <- [];
+	map<string, float> production_vehicules <- ["minibus"::3, "tgv"::2, "ter"::3, "taxi"::3, "bike"::3];
 	
 	list<string> short_transport <- ["trip_minibus","trip_bike","trip_walking"];
 	list<string> long_transport <- ["trip_tgv", "trip_ter", "trip_taxi"];
@@ -75,7 +76,7 @@ global {
 	];
 	
     // max trip per month
-    map<string, int> vehicle_max_trips <- ["taxi"::330, "tgv"::120, "ter"::240, "minibus"::390, "bike"::225];
+    map<string, int> vehicle_max_trips <- ["taxi"::60, "tgv"::120, "ter"::240, "minibus"::390, "bike"::225];
     
 	init{ // a security added to avoid launching an experiment without the other blocs
 		if (length(coordinator) = 0){
@@ -914,14 +915,50 @@ species transport_mode {
 	float alpha;
 
 	action update_available(float km_travelled){
-		if (number_available != 0){
-			km_age <- km_age + km_travelled / number_available; // km_travelled est pour tous les véhicules
-			// TODO ajouter la maintenance
-			float ratio <- (km_age / km_end_of_life) ^ alpha;
-			number_available <- max(number_available - int(number_available * ratio), 0); // max support emotionnel
-			// write(number_available);
-		}	
-	}
+        if (number_available != 0){
+            km_age <- km_age + km_travelled / number_available; // km_travelled est pour tous les véhicules
+            float ratio <- (km_age / km_end_of_life) ^ alpha;
+            int detruit <- number_available;
+            number_available <- max(number_available - int(number_available * ratio), 0); // max support emotionnel
+            detruit <- detruit - number_available;
+            if(number_available > 0){
+                km_age <- km_age - detruit * (km_end_of_life / number_available);    
+            }
+            
+        }
+        switch(type){
+            match "taxis"{
+                if(transport_usage["trip_taxi"] >= 0.5){
+                    number_available <- number_available + 15000;
+                }
+            }
+            match "tgvs"{
+                if(transport_usage["trip_tgv"] >= 0.5){
+                    number_available <- number_available + 2;
+                }
+            }
+            match "ters"{
+                if(transport_usage["trip_ter"] >= 0.5){
+                    number_available <- number_available + 33;
+                }
+            }
+            match "minibuses"{
+                if(transport_usage["trip_minibus"] >= 0.5){
+                    number_available <- number_available + 350;
+                }
+            }
+            match "bikes"{
+                if(transport_usage["trip_bike"] >= 0.5){
+                    number_available <- number_available + 10000;
+                }
+            }
+            default {}
+        }
+        // TODO: stocker le nombre de véhicules produits dans un tableau pour pouvoir faire une demande de plastique
+        write(type);
+        write(number_available);
+        write(transport_usage[type]);
+    }
 }
 species taxis parent:transport_mode {
 	init{
