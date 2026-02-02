@@ -19,7 +19,7 @@ global {
 	list<string> production_perishables_A <- ["kg_meat", "kg_vegetables"];
 	
 	int pop_size <- 10000;	// number of agents
-	int prop_human <- round(7 * 1e7 / pop_size);		// number of human an agent represents
+	int prop_human <- 7000;		// number of human an agent represents
 	int tick_counter <- 0; // track month, we start in spring
 	//float total_surface_used_A <- 0.0;
 	
@@ -65,7 +65,7 @@ global {
 	float climate_max <- 1.3;
 
 	/* Consumption data */
-	map<string, float> individual_consumption_A <- ["kg_meat"::2 * prop_human, "kg_vegetables"::15 * prop_human]; // monthly consumption per individual of the population
+	map<string, float> individual_consumption_A <- ["kg_meat"::2, "kg_vegetables"::15]; // monthly consumption per individual of the population
 	//float surface_veg_A <- individual_consumption_A["kg_vegetables"] * pop_size * production_output_inputs_A["kg_vegetables"]["m² land"];
 	//float surface_meat_A <- individual_consumption_A["kg_meat"] * pop_size * production_output_inputs_A["kg_meat"]["m² land"];
 
@@ -160,6 +160,7 @@ species agricultural parent: bloc {
 		}
 
 		pop_size <- length(pop);
+		prop_human <- round(7 * 1e7 / pop_size);
 	}
 
 	action set_external_producer (string product, bloc bloc_agent) {
@@ -218,6 +219,7 @@ species agricultural parent: bloc {
 
 		} else if (cycle = 0){ // Creates intial farms on first tick
 			write "Init pop_size " + pop_size;
+			write "Init prop_human " + prop_human;
 			do calculate_initial_farms();
 			products_stock_A <- producer.get_products_stock(); // init with stocks
 		}
@@ -263,7 +265,7 @@ species agricultural parent: bloc {
                 	}
                 	
             		if not ok {
-            			//write "Pénurie de " + c + " , stock est " + round(100 * products_stock[c]/myself.consumed[c]) + "% de demande totale.";
+            			write "Pénurie de " + c ;
             			
             			float shortage_coef <- 0.0;
             			if (demand_qty > 0) {
@@ -301,14 +303,15 @@ species agricultural parent: bloc {
 	
 	action calculate_initial_farms {
 		write "Pop size used for init demand " + pop_size;
-        float monthly_meat_demand_total <- individual_consumption_A["kg_meat"] * pop_size;
+		write "Prop human used for init "+ prop_human;
+        float monthly_meat_demand_total <- individual_consumption_A["kg_meat"] * pop_size * prop_human;
         float monthly_meat_demand_farms <- max(0, monthly_meat_demand_total - kg_gibier_monthly);
-        float monthly_veg_demand <- individual_consumption_A["kg_vegetables"] * pop_size;
+        float monthly_veg_demand <- individual_consumption_A["kg_vegetables"] * pop_size * prop_human;
         float init_monthly_cotton_demand <- 50000 * 1e3; // hypothèse : init de 50 000 tonnes
         
         // Calculate surface needed (with safety margin of 10%)
         float safety_margin <- 1.0;
-        float surface_needed_meat <- monthly_meat_demand_farms * production_output_inputs_A["kg_meat"]["m² land"] * safety_margin;
+        float surface_needed_meat <- monthly_meat_demand_total * production_output_inputs_A["kg_meat"]["m² land"] * safety_margin;
         float surface_needed_veg <- monthly_veg_demand * production_output_inputs_A["kg_vegetables"]["m² land"] * safety_margin;
         float surface_needed_cotton <- init_monthly_cotton_demand * production_output_inputs_A["kg_cotton"]["m² land"] * safety_margin;
         float total_surface_needed <- surface_needed_meat + surface_needed_veg + surface_needed_cotton;
@@ -724,7 +727,7 @@ species agricultural parent: bloc {
 		/* Allows to set the demand of products' qty to be consumed */
 		action consume (human h) {
 			loop c over: individual_consumption_A.keys {
-				consumed[c] <- consumed[c] + individual_consumption_A[c];
+				consumed[c] <- consumed[c] + individual_consumption_A[c] * prop_human;
 			}
 
 		}
@@ -875,7 +878,7 @@ experiment run_agricultural type: gui {
 			}
 			
 			chart "Resources usage" type: series size: {0.5, 0.5} position: {0.5, 0.5} {
-				data "kL water (1000 L)" value: tick_resources_used_A["L water"]/1000 color:#skyblue;
+				data "L water" value: tick_resources_used_A["L water"] color:#skyblue;
 				data "kWh energy" value: tick_resources_used_A["kWh energy"] color:#orange;
 				data "m² land" value: tick_resources_used_A["m² land"] color:#pink;
 
