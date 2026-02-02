@@ -26,17 +26,17 @@ global {
 	
 	/* Production data */
 	map<string, map<string, float>> production_outputs_inputs_T <-
-	["minibus" :: ["kWh energy" :: 51240.0, "kg plastic" :: 2390.0],  
-	"tgv" :: ["kWh energy" :: 1001250.0, "kg plastic" :: 46700.0],
-	"ter" :: ["kWh energy" :: 616185.0, "kg plastic" :: 28740.0],
-	"bike" :: ["kWh energy" :: 38.0, "kg plastic" :: 1.8],
-	"taxi" :: ["kWh energy" :: 34700.0, "kg plastic" :: 180.0]];
+	["minibus" :: ["kWh energy" :: 3520.0, "kg plastic" :: 2395.0],  
+	"tgv" :: ["kWh energy" :: 46700.0, "kg plastic" :: 46700.0],
+	"ter" :: ["kWh energy" :: 28740.0, "kg plastic" :: 28740.0],
+	"bike" :: ["kWh energy" :: 1.5, "kg plastic" :: 1.0],
+	"taxi" :: ["kWh energy" :: 265.0, "kg plastic" :: 180.0]];
 	map<string, map<string, float>> production_output_emissions_T <- 
-	["minibus" :: ["gCO2e emissions" :: 9560000.0],
-	"tgv" :: ["gCO2e emissions" :: 326900000.0],
-	"ter" :: ["gCO2e emissions" :: 201180000.0],
-	"bike" :: ["gCO2e emissions" :: 150000.0],
-	"taxi" :: ["gCO2e emissions" :: 10000000.0]];
+	["minibus" :: ["gCO2e emissions" :: 1856000.0],
+	"tgv" :: ["gCO2e emissions" :: 36193.0],
+	"ter" :: ["gCO2e emissions" :: 22276.0],
+	"bike" :: ["gCO2e emissions" :: 775.0],
+	"taxi" :: ["gCO2e emissions" :: 140000.0]];
 	
 	/* Counters & Stats */
 	map<string, float> tick_production_T <- [];
