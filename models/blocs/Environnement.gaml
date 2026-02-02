@@ -100,7 +100,7 @@ species environnement parent: bloc {
 			tick_production_ECO <- producer.get_tick_outputs_produced(); // collect production
 			tick_absorbed_ECO <- producer.get_tick_emissions(); // collect emissions
 			//			write "tick_production_ECO: " + tick_production_ECO;
-						write "tick_absorded_ECO: " + tick_absorbed_ECO;
+						//write "tick_absorded_ECO: " + tick_absorbed_ECO;
 			ask eco_producer { // prepare next tick on producer side
 				do reset_tick_counters;
 			}

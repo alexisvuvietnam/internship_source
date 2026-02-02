@@ -19,7 +19,7 @@ import "blocs/Environnement.gaml"
  */
 global {
 // parameters for city generation
-	int population_size <- 1000000; // number of people in the simulation
+	int population_size <- 10000; // number of people in the simulation
 	int number_of_mini_cities <- 100; // number of mini-cities
 	int city_population <- 70000; // number of people per city (constellations of mini-cities)
 	bool use_gis <- true; // use GIS or not (needed to spatialise, instanciate territory species, and to display the map)
@@ -85,10 +85,12 @@ global {
 		// instanciate the blocs (E, A and R blocs here):
 		create residents number: 1 {
 			enabled <- enable_demography;
+			nb_init_individuals <- population_size;
 		}
 
 		create agricultural number: 1 {
 			pop_size <- population_size;
+			prop_human <- round(7 * 1e7 / pop_size);
 		}
 
 		create energy number: 1;
