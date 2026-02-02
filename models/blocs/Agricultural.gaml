@@ -307,8 +307,8 @@ species agricultural parent: bloc {
         float init_monthly_cotton_demand <- 50000 * 1e3; // hypothèse : init de 50 000 tonnes
         
         // Calculate surface needed (with safety margin of 10%)
-        float safety_margin <- 1.1;
-        float surface_needed_meat <- monthly_meat_demand_total * production_output_inputs_A["kg_meat"]["m² land"] * safety_margin;
+        float safety_margin <- 1.0;
+        float surface_needed_meat <- monthly_meat_demand_farms * production_output_inputs_A["kg_meat"]["m² land"] * safety_margin;
         float surface_needed_veg <- monthly_veg_demand * production_output_inputs_A["kg_vegetables"]["m² land"] * safety_margin;
         float surface_needed_cotton <- init_monthly_cotton_demand * production_output_inputs_A["kg_cotton"]["m² land"] * safety_margin;
         float total_surface_needed <- surface_needed_meat + surface_needed_veg + surface_needed_cotton;
@@ -563,7 +563,8 @@ species agricultural parent: bloc {
 		
 		/* Stock related */
 		map<string, float> tick_waste <- []; // product, qty of product that perishes -> eliminated from stock
-		map<string, float> products_stock <- ["kg_meat":: 1.4 * 1e8, "kg_vegetables"::2.0 * 1e9, "kg_cotton"::50000.0 * 1e3];
+		//map<string, float> products_stock <- ["kg_meat":: 1.4 * 1e8, "kg_vegetables"::2.0 * 1e9, "kg_cotton"::50000.0 * 1e3];
+		map<string, float> products_stock <- ["kg_meat"::0.0, "kg_vegetables"::0.0, "kg_cotton"::0.0];
 		map<string, float> perish_rate <- ["kg_meat"::0.05, "kg_vegetables"::0.08]; //choix arbitraire
 		
 		
