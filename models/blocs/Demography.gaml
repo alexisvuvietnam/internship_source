@@ -1,7 +1,10 @@
 /**
-* Name: Demography bloc (MOSIMA)
+* Name: Demography bloc (MOSIMA) - Aggregated Population Version
 * Authors: Maël Franceschetti, Cédric Herpson, Jean-Daniel Kant
 * Mail: firstname.lastname@lip6.fr
+* 
+* This version uses aggregated population counts at the city level instead of individual agents.
+* Population is represented as integers with demographic distributions stored as maps.
 */
 
 model Demography
@@ -24,17 +27,24 @@ global{
 	map<string, float> init_gender_distrib <- [ // initial gender distribution in the population
 		male_gender ::0.4839825904115131, 
 		female_gender ::0.516017409588487
-	];  // ne need to use a csv file here, just two values
+	];
+	
+	/* Age categories for tracking population structure */
+	list<int> age_categories <- [0, 6, 18, 67, 105];
 
 	/* Parameters */ 
 	float coeff_birth <- 1.0; // a parameter that can be used to increase or decrease the birth probability
 	float coeff_death <- 1.0; // a parameter that can be used to increase or decrease the death probability
-	int nb_init_individuals <- 10000; // pop size
 	
-	/* Counters & Stats */
-	int nb_inds -> {length(individual)};
-	float births <- 0; // counter, accumulate the total number of births
-	float deaths <- 0; // counter, accumulate the total number of deaths
+	/* Counters & Stats - Global aggregates */
+	int total_population <- 0 update: sum(mini_city_demography collect each.pop);
+	int total_males <- 0 update: sum(mini_city_demography collect each.males);
+	int total_females <- 0 update: sum(mini_city_demography collect each.females);
+	float total_births <- 0.0;
+	float total_deaths <- 0.0;
+	
+	// Age pyramid data (aggregated from all cities)
+	map<string, int> global_age_pyramid <- [];
 	
 	// tracks the current food shortage impact on mortality
 	float shortage_mortality_factor <- 1.0; 
@@ -43,58 +53,94 @@ global{
 		// a security added to avoid launching an experiment without the other blocs
 		if (length(coordinator) = 0){
 			error "Coordinator agent not found. Ensure you launched the experiment from the Main model";
-			// If you see this error when trying to run an experiment, this means the coordinator agent does not exist.
-			// Ensure you launched the experiment from the Main model (and not from the bloc model containing the experiment).
 		}
 	}
 	
 	/* Load gender data (distribution, probabilities) per age category from a csv file */
 	map<string, map<int, float>> load_gender_data(string filename){
-		file input_file <- csv_file(filename, ","); // load the csv file and separate the columns
-        matrix data_matrix <- matrix(input_file); // put the data in a matrix
-        map<int, float> male_data <- create_map(data_matrix column_at 0, data_matrix column_at 1); // create a map from male data
-        map<int, float> female_data <- create_map(data_matrix column_at 0, data_matrix column_at 2); // same for female data
-        map<string, map<int, float>> data <- [male_gender::male_data, female_gender::female_data]; // zip it in a all-in-one map
-        return data; // return it
+		file input_file <- csv_file(filename, ",");
+        matrix data_matrix <- matrix(input_file);
+        map<int, float> male_data <- create_map(data_matrix column_at 0, data_matrix column_at 1);
+        map<int, float> female_data <- create_map(data_matrix column_at 0, data_matrix column_at 2);
+        map<string, map<int, float>> data <- [male_gender::male_data, female_gender::female_data];
+        return data;
+	}
+	
+	map<int, float> load_age_data(string filename) {
+		file input_file <- csv_file(filename, ",");
+		matrix data_matrix <- matrix(input_file);
+		list<int> ages <- list<int>(data_matrix column_at 0);
+		list<float> values <- list<float>(data_matrix column_at 1);
+		map<int, float> result <- create_map(ages, values);
+		return result;
 	}
 	
 }
 
 
 /**
- * We define here the content of the demography (or "resident") bloc as a species.
- * We implement the methods of the API. Some are empty (do nothing) because this bloc do not have consumption nor production.
- * We also add methods specific to this bloc to handle the births and deaths in the population.
+ * Demography bloc using aggregated population counts.
+ * No individual agents are created - population is tracked as integers at the city level.
+ * Each mini_city maintains:
+ * - Total population count
+ * - Gender distribution
+ * - Age distribution by category
  */
 species residents parent:bloc{
 	string name <- "residents";
 	bool enabled <- false; // true to activate the demography (births, deaths), else false.
 	
+	// City-based demography information
+	list<mini_city_demography> mini_cities <- [];
+	list<main_city> main_cities <- [];
+	
+	int tick_counter <- 0; // Track ticks for annual updates
+	
+	action refresh_city_lists {
+	    mini_cities <- list(mini_city_demography);
+	    main_cities <- list(main_city);
+	}
+	
 	/* setup the resident agent : initialize the population */
 	action setup{
-		do init_population;
+		do init_population_from_cities;
 	}
 	
 	/* updates the population every tick */
-	action tick(list<human> pop){
-		do collect_last_tick_data;
-		if(enabled){
-			do update_births;
-			do update_deaths;
-			do increment_age;
-		}
+	action tick(list<human> pop) {
+	    if tick_counter = 0 {
+	        do refresh_city_lists;
+	        do setup;
+	    }
+	
+	    tick_counter <- tick_counter + 1;
+	
+	    if enabled {
+	        if tick_counter >= nb_ticks_per_year {
+	            ask mini_cities {
+	                do apply_births;
+	                do apply_deaths;
+	                do age_population;
+	            }
+	            tick_counter <- 0;
+	        }
+	    }
+	
+	    do collect_statistics;
 	}
+
+
 	
 	list<string> get_input_resources_labels{ 
-		return []; // no resources for demography component (function declared only to respect bloc API)
+		return [];
 	}
 	
 	list<string> get_output_resources_labels{
-		return []; // no resources for demography component (function declared only to respect bloc API)
+		return [];
 	}
 	
 	production_agent get_producer{
-		return nil; // no producer for demography component (function declared only to respect bloc API)
+		return nil;
 	}
 	
 	action collect_last_tick_data{ // update stats & measures
@@ -133,73 +179,124 @@ species residents parent:bloc{
 			age <- rnd_choice(init_age_distrib[gender]);  // pick an initial age with respect to the real distribution and gender
 			do update_demog_probas;
 		}
-	}
-
-   /* apply births */
-	action update_births{ 
-		int new_births <- 0;
-		ask individual{
-			if(ticks_before_birthday<=0){ // check only once a year for each individual
-				if(gender = female_gender and flip(p_birth)){ // women can have children
-					new_births <- new_births + 1;
-				}
+		
+		// Aggregate age pyramid
+		global_age_pyramid <- [];
+		loop age_cat over: age_categories {
+			string key <- "]" + (age_cat - 15) + ";" + age_cat + "]";
+			if age_cat = 0 {
+				key <- "]0;15]";
 			}
-		}
-		int nb_f <- individual count(each.gender=female_gender and not(dead(each)));
-		create individual number:new_births;
-		births <- births + new_births;
-	}
-	
-	/* apply deaths*/
-	action update_deaths{
-		ask individual{
-			if(ticks_before_birthday<=0){ // check only once a year for each individual
-				if(flip(p_death)){ // every individual has a chance to die every month, or die by reaching max_age
-					deaths <- deaths +1;
-					do die;
-				}
-			}
+			int count <- sum(mini_cities collect (each.age_distribution[age_cat]));
+			global_age_pyramid[key] <- count;
 		}
 	}
 	
-	/* increments the age of the individual if the tick corresponds to its birthday, and updates birth and death probabilities */
-	action increment_age{
-		ask individual{
-			if(ticks_before_birthday<=0){ // if the current tick is the individual birth date, increment the age
-				age <- age +1;
-				ticks_before_birthday <- nb_ticks_per_year;
-				do update_demog_probas; // update the death and birth probabilities
-			}
-			else{
-				ticks_before_birthday <- ticks_before_birthday -1;
-			}
+	/* Initialize population in each mini_city based on demographic distributions */
+	action init_population_from_cities{
+		if empty(mini_cities) {
+			write "ERREUR: mini_cities est vide, aucune population ne sera créer.";
+			return;
+		}
+		
+		ask mini_cities {
+			do initialize_demographics;
 		}
 	}
-
+	
+	/*
+	 * Get the current total population size.
+	 * Other blocs can call this to get the current population count.
+	 */
+	int get_total_population {
+		return total_population;
+	}
+	
+	/*
+	 * Get the list of mini_cities with current population data.
+	 * Other blocs can use this to access city-specific population information.
+	 */
+	list<mini_city> get_mini_cities_with_population {
+		return mini_cities;
+	}
 }
 
 /**
- * We define the agents used in the demography bloc. We here extends the 'human' species of the API to add some functionalities.
- * Be careful to define features that will only be called within the demography block, in order to respect the API.
- * 
- * The demography of our population will here be based on death and birth probabilities.
- * These probabilities will depend on somme attributes of the individuals (age, gender ...).
- * We propose some formulas for these probabilities, based on INSEE data. These are rough estimates.
+ * Extended mini_city species with demographic tracking.
+ * Each mini_city maintains aggregated population data without creating individual agents.
  */
-species individual parent:human{
-	float p_death <- 0.0;
-	float p_birth <- 0.0;
-	int ticks_before_birthday <- 0;
-	int delay_next_child <- 0;
-	int child <- 0;
+species mini_city_demography parent: mini_city {
+	// Demographic attributes
+	string female_gender;
+	string male_gender;
+	int males <- 0;
+	int females <- 0;
+	int go_to_school;
+	int go_to_work;
 	
-	init{
-		gender <- one_of ([female_gender, male_gender]); // pick a gender randomly
-	    ticks_before_birthday <- rnd(nb_ticks_per_year); // set a random birth date in the year (uniformly)
-	    // set initial birth & death probabilities :
-	    p_birth <- get_p_birth(); 
-		p_death <- get_p_death();
+	// age distribution: map from age category to count
+	map<int, int> age_distribution <- [];
+	
+	// gender-specific age distributions
+	map<string, map<int, int>> gender_age_distribution;
+	
+	// tracking for statistics
+	float births_this_year <- 0.0;
+	float deaths_this_year <- 0.0;
+	
+	/**
+	 * initialize demographic structure based on population size and distributions
+	 */
+	action initialize_demographics {
+	    male_gender <- "M";
+	    female_gender <- "F";
+			
+		males <- int(pop * init_gender_distrib[male_gender]);
+	    females <- pop - males;
+	
+	    if (gender_age_distribution = nil) {
+	        gender_age_distribution <- [];
+	    }
+	
+	    if (age_distribution = nil) {
+	        age_distribution <- [];
+	    }
+	
+	    loop gender over: [male_gender, female_gender] {
+	
+	        int gender_pop <- (gender = male_gender) ? males : females;
+	        map<int, float> age_probs <- init_age_distrib[gender];
+	
+	        if (age_probs = nil) {
+	            write "ERREUR: Distribution des ages manquante " + gender;
+	            continue;
+	        }
+	
+	        if (gender_age_distribution[gender] = nil) {
+	            gender_age_distribution[gender] <- [];
+	        }
+	
+	        loop i from: 0 to: length(age_categories) - 1 {
+	
+	            int age_cat <- age_categories[i];
+	            float proportion <- age_probs[age_cat];
+	            int count <- int(gender_pop * proportion);
+	
+	            gender_age_distribution[gender][age_cat] <- count;
+	
+	            if (age_distribution[age_cat] = nil) {
+	                age_distribution[age_cat] <- 0;
+	            }
+	
+	            age_distribution[age_cat] <- age_distribution[age_cat] + count;
+	        }
+	    }
+	    
+	    go_to_school <- put_category(18);
+	    go_to_work <- put_category(67);
+	    
 	}
+
 	
 	/* returns the age category matching the age of the individual from a list */
 	int get_age_category(list<int> ages_categories){
@@ -235,27 +332,114 @@ species individual parent:human{
 		if(gender = male_gender){ // male don't give birth
 			return 0.0;
 		}
-		int age_cat <- get_age_category(birth_proba[gender].keys);
-		float p_birth <-  birth_proba[gender][age_cat];
-		return p_birth * coeff_birth;
 	}
 	
-	/* updates birth and death probabilities of the individual */
-	action update_demog_probas{
-		p_birth <- get_p_birth();
-		p_death <- get_p_death();
+	/**
+	 * Apply deaths based on age-specific mortality rates
+	 */
+	action apply_deaths {
+		float expected_deaths <- 0.0;
+		map<int, int> male_age_map <- age_categories as_map (each::0);
+		map<int, int> female_age_map <- age_categories as_map (each::0);
+		map<string, map<int, int>> deaths_by_gender_age <- [
+			male_gender :: male_age_map,
+			female_gender :: female_age_map
+		];
+		
+		// calculate deaths for each gender and age category
+		loop gender over: [male_gender, female_gender] {
+			loop age_cat over: age_categories {
+				int count <- gender_age_distribution[gender][age_cat];
+				if count > 0 {
+					float death_prob <- death_proba[gender][age_cat];
+					death_prob <- death_prob * coeff_death;
+					
+					float expected <- count * death_prob;
+					int deaths <- int(expected) + (flip(expected - int(expected)) ? 1 : 0);
+					deaths <- min([deaths, count]); // Can't exceed population in category
+					
+					deaths_by_gender_age[gender][age_cat] <- deaths;
+					expected_deaths <- expected_deaths + deaths;
+				}
+			}
+		}
+		
+		// apply deaths
+		loop gender over: [male_gender, female_gender] {
+			loop age_cat over: age_categories {
+				int deaths <- deaths_by_gender_age[gender][age_cat];
+				if deaths > 0 {
+					gender_age_distribution[gender][age_cat] <- gender_age_distribution[gender][age_cat] - deaths;
+					age_distribution[age_cat] <- age_distribution[age_cat] - deaths;
+					
+					if gender = male_gender {
+						males <- males - deaths;
+					} else {
+						females <- females - deaths;
+					}
+					
+					pop <- pop - deaths;
+					deaths_this_year <- deaths_this_year + deaths;
+				}
+			}
+		}
+	}
+	
+	/**
+	 * Age the population by moving people to next age categories
+	 */
+	action age_population {
+		// create new age distributions
+		map<int, int> new_age_distribution <- [];
+		map<int, int> male_age_map <- age_categories as_map (each::0);
+		map<int, int> female_age_map <- age_categories as_map (each::0);
+		map<string, map<int, int>> new_gender_age_distribution <- [
+			male_gender :: male_age_map,
+			female_gender :: female_age_map
+		];
+		
+		// age each cohort
+		loop gender over: [male_gender, female_gender] {
+			loop i from: 0 to: length(age_categories) - 1 {
+				int current_age <- age_categories[i];
+				int count <- gender_age_distribution[gender][current_age];
+				
+				if count > 0 {
+					// move to next age category (or stay in last one)
+					int next_age <- current_age;
+					if i < length(age_categories) - 1 {
+						next_age <- age_categories[i + 1];
+					}
+					
+					new_gender_age_distribution[gender][next_age] <- (new_gender_age_distribution[gender][next_age]) + count;
+					new_age_distribution[next_age] <- (new_age_distribution[next_age]) + count;
+				}
+			}
+		}
+		
+		// Update distributions
+		age_distribution <- new_age_distribution;
+		gender_age_distribution <- new_gender_age_distribution;
+	    go_to_school <- put_category(18);
+	    go_to_work <- put_category(67);
+	}
+	
+	int put_category(int age_category){
+		return int(pop * age_distribution[age_category]);
+	}
+	
+	// --- GIS
+	
+	aspect population {
+		rgb pop_color <- rgb(min([255, pop / 100]), 100, 100);
+		draw circle(radius) color: pop_color border: #black;
+		//draw sting(pop) color: #black size: 12 at: location;
 	}
 }
-
 /**
- * We define here the experiment and the displays related to demography. 
- * We will then be able to run this experiment from the Main code of the simulation, with all the blocs connected.
- * 
- * Note : experiment car inherit another experiment, but we can't combine displays from multiple experiments at the same time. 
- * If needed, a new experiment combining all those displays should be added, for example in the Main code of the simulation.
+ * Experiment for demography visualization with aggregated population
  */
 experiment run_demography type: gui {
-	parameter "Initial number of individuals" var: nb_init_individuals min: 0 category: "Initialisation";
 	parameter "Coefficient for birth probability" var: coeff_birth min: 0.0 max: 10.0 category: "Demography";
 	parameter "Coefficient for death probability" var: coeff_death min: 0.0 max: 10.0 category: "Demography";
 	parameter "Number of ticks per year" var: nb_ticks_per_year min:1 category: "Simulation";
@@ -263,27 +447,16 @@ experiment run_demography type: gui {
 	output {
 		display Population_information {
 			chart "Gender evolution" type: series size: {0.5,0.5} position: {0, 0} {
-				data "number_of_man" value: individual count(not dead(each) and each.gender = male_gender) color: #red;
-				data "number_of_woman" value: individual count(not dead(each) and each.gender = female_gender) color: #blue;
-				data "total_individuals" value: individual count(not dead(each)) color: #black;
+				data "Males" value: total_males color: #red;
+				data "Females" value: total_females color: #blue;
+				data "Total population" value: total_population color: #black;
 			}
-			chart "Age Pyramid" type: histogram background: #lightgray size: {0.5,0.5} position: {0, 0.5} {
-				data "]0;15]" value: individual count (not dead(each) and each.age <= 15) color:#blue;
-				data "]15;30]" value: individual count (not dead(each) and (each.age > 15) and (each.age <= 30)) color:#blue;
-				data "]30;45]" value: individual count (not dead(each) and (each.age > 30) and (each.age <= 45)) color:#blue;
-				data "]45;60]" value: individual count (not dead(each) and (each.age > 45) and (each.age <= 60)) color:#blue;
-				data "]60;75]" value: individual count (not dead(each) and (each.age > 60) and (each.age <= 75)) color:#blue;
-				data "]75;90]" value: individual count (not dead(each) and (each.age > 75) and (each.age <= 90)) color:#blue;
-				data "]90;105]" value: individual count (not dead(each) and (each.age > 90) and (each.age <= 105)) color:#blue;
-			}
+			
 			chart "Births and deaths" type: series size: {0.5,0.5} position: {0.5, 0} {
-				data "number_of_births" value: births color: #green;
-				data "number_of_deaths" value: deaths color: #black;
+				data "Births" value: total_births color: #green;
+				data "Deaths" value: total_deaths color: #red;
+				data "Net change" value: total_births - total_deaths color: #black;
 			}
 		}
 	}
 }
-
-
-
-
