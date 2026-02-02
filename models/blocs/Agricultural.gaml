@@ -20,7 +20,7 @@ global {
 	
 	int pop_size <- 10000;	// number of agents
 	int prop_human <- round(7 * 1e7 / pop_size);		// number of human an agent represents
-	int tick_counter <- 3; // track mont)h, we start in spring
+	int tick_counter <- 0; // track month, we start in spring
 	//float total_surface_used_A <- 0.0;
 	
 	/* Gibiers par mois moyenne : 13442208.3kg (9,8%) */
@@ -52,12 +52,12 @@ global {
 	map<string, float> kg_per_m2 <- ["kg_meat"::0.04, "kg_vegetables"::1.67, "kg_cotton"::0.066];
 
 	/* Seasonal multipliers */
-	/* Seasons: 0-2=Winter, 3-5=Spring, 6-8=Summer, 9-11=Autumn */
+	/* Seasons: 0-2=Spring, 3-5=Summer, 6-8=Autumn, 9-11=Winter */
 	// data to check to adjust for meat
 	map<string, list<float>> season_multipliers <- [
-		"kg_meat"::[0.85, 0.85, 0.85, 1.0, 1.0, 1.0, 1.15, 1.15, 1.15, 1.0, 1.0, 1.0], 
-		"kg_vegetables"::[0.5, 0.5, 0.8, 0.8, 1.2, 1.3, 1.4, 1.3, 1.2, 1.0, 0.7, 0.6],
-		"kg_cotton"::[0.3, 0.3, 0.5, 0.7, 0.9, 1.0, 1.2, 1.3, 1.5, 1.4, 0.8, 0.5] // hypothèse production raisonable en france (recolte en autumn)
+		"kg_meat"::[1.0, 1.0, 1.0, 1.15, 1.15, 1.15, 1.0, 1.0, 1.0, 0.85, 0.85, 0.85], 
+		"kg_vegetables"::[0.8, 1.2, 1.3, 1.4, 1.3, 1.2, 1.0, 0.7, 0.6, 0.5, 0.5, 0.8],
+		"kg_cotton"::[0.7, 0.9, 1.0, 1.2, 1.3, 1.5, 1.4, 0.8, 0.5, 0.3, 0.3, 0.5] 
 	];
 	
 	/* Climate variability parameters */
@@ -80,8 +80,8 @@ global {
 	float total_surface_farms_A <- 0.0;
 	
 	/* To optimize number of farms */
-	map<string, float> anual_pop_consumption_A <- [];
-	map<string, float> anual_production_A <- [];
+	map<string, float> anual_pop_consumption_A <- ["kg_meat"::0.0, "kg_vegetables"::0.0];
+	map<string, float> anual_production_A <- ["kg_meat"::0.0, "kg_vegetables"::0.0];
 	
 	
 
@@ -110,8 +110,6 @@ species agricultural parent: bloc {
 	
 	/* ----- MICRO VAR ----- */
 	list<farm> farms_list;
-	float total_farms_surface <- 0.0;
-	int total_num_farms <- 0;
 	float max_farm_surface_m2 <- 35.0 * 1e4; //taille moyenne en france 70 ha 2020
 	float min_farm_surface_m2 <- 5.0 * 1e4;
 	
@@ -147,8 +145,9 @@ species agricultural parent: bloc {
 		
 		do population_activity(pop);
 		
-		if (tick_counter = 0) {
-			do update_farms_list;
+		if (tick_counter = 11) {
+			do update_farms_list();
+			do reset_anual_data();
 		}
 		
 		if (tick_counter = 11) {
@@ -175,9 +174,9 @@ species agricultural parent: bloc {
 		return production_outputs_A;
 	}
 
-	list<string> get_output_resources_labels {
-		return production_outputs_A;
-	}
+//	list<string> get_output_resources_labels {
+//		return production_outputs_A;
+//	}
 
 	list<string> get_input_resources_labels {
 		return production_inputs_A;
@@ -186,14 +185,7 @@ species agricultural parent: bloc {
 	list<string> get_emissions_labels {
 		return production_emissions_A;
 	}
-	
-	float get_total_farms_surface {
-    	return total_farms_surface;
-    }
-    
-    int get_total_num_farms {
-    	return total_num_farms;
-    }
+
 
 	action collect_last_tick_data {
 		if (cycle > 0) { // skip it the first tick
@@ -204,11 +196,8 @@ species agricultural parent: bloc {
 			products_stock_A <- producer.get_products_stock(); // collect stock
 			tick_waste_A <- producer.get_tick_waste();
 			
-			total_surface_farms_A <- total_farms_surface;
-			total_num_farms_A <- total_num_farms;
 			
-			
-			if (tick_counter != 0) { // to collect anual data
+			if (tick_counter != 11) { // to collect anual data
 				do update_anual_data_with_tick();
 			}
 			
@@ -271,8 +260,8 @@ species agricultural parent: bloc {
         float monthly_veg_demand <- individual_consumption_A["kg_vegetables"] * pop_size;
         float init_monthly_cotton_demand <- 50000 * 1e3; // hypothèse : init de 50 000 tonnes
         
-        // Calculate surface needed (with safety margin of 20%)
-        float safety_margin <- 1.2;
+        // Calculate surface needed (with safety margin of 10%)
+        float safety_margin <- 1.1;
         float surface_needed_meat <- monthly_meat_demand_total * production_output_inputs_A["kg_meat"]["m² land"] * safety_margin;
         float surface_needed_veg <- monthly_veg_demand * production_output_inputs_A["kg_vegetables"]["m² land"] * safety_margin;
         float surface_needed_cotton <- init_monthly_cotton_demand * production_output_inputs_A["kg_cotton"]["m² land"] * safety_margin;
@@ -321,22 +310,18 @@ species agricultural parent: bloc {
         
         // Check if surface available for all init farms
         float total_surface_needed <- meat_surface + veg_surface + cotton_surface;
-        bool surface_granted <- false ;
         ask agri_producer {
         	if (external_producers.keys contains "m² land"){
-        		surface_granted <- external_producers["m² land"].producer.produce(["m² land"::total_surface_needed]);
+        		bool surface_granted <- external_producers["m² land"].producer.produce(["m² land"::total_surface_needed]);
+        		if (not surface_granted) {
+			        write "ERROR " + total_surface_needed + " m² could not be allocated to initial farms";
+			        write "   Agricultural bloc cannot initialize properly!";
+			        return;
+			    }
         	} else {
         		write "ERROR: No external producer for 'm² land' configured!";
         	}
         }
-        
-        if (not surface_granted) {
-	        write "ERROR " + total_surface_needed + " m² could not be allocated to initial farms";
-	        write "   Agricultural bloc cannot initialize properly!";
-	        return;
-	    }
-	    
-	    total_farms_surface <- total_surface_needed;
         
         // Create meat farms
         list<farm> created_farms <- [];
@@ -373,10 +358,11 @@ species agricultural parent: bloc {
             farms_list <- farms_list + created_farms;
         }
         
-        total_num_farms <- length(farms_list);
+        total_num_farms_A <- length(farms_list);
+        total_surface_farms_A <- total_surface_needed;
         
         write "Farms created: " + nb_meat_farms + " meat, " + nb_veg_farms + " vegetables, " + nb_cotton_farms + " cotton, "+ nb_mixed_farms + " mixed";
-        write "Total farms: " + total_num_farms;
+        write "Total farms: " + length(farms_list);
     }
     
     /* To add the pop_consumption and the production of each tick in the same year.
@@ -389,62 +375,94 @@ species agricultural parent: bloc {
     	}
     }
     
+    action reset_anual_data {
+    	loop p over: individual_consumption_A.keys {
+	        anual_pop_consumption_A[p] <- 0.0;
+	        anual_production_A[p] <- 0.0;
+	    }
+    }
+    
     /* Depending on production/consumption ratio we delete farms or add */
     action update_farms_list {
+    	map<string, float> upper_threshold <- ["kg_meat"::1.1, "kg_vegetables"::1.3];
     	
     	loop p over:individual_consumption_A.keys {
     		float ratio <- anual_production_A[p]/anual_pop_consumption_A[p];
     		
-    		list<farm> producing_farms <- farms_list where (each.farm_produces(p)); 
+    		// TODO does farm_list update itself od its contents ?
+    		list<farm> producing_farms <- farms_list where (each.farm_type = get_farm_type_for_product(p)); 
     		
-    		if (ratio > 1.2) { // over production -> change type farm or delete them
-    			int num_to_convert <- round(0.1 * length(producing_farms));
-    			int half <- num_to_convert div 2;
+    		if (ratio > upper_threshold[p]) { // over production -> change type farm or delete them
+    		
+    			int num_to_delete <- round(0.1 * length(producing_farms));
+//    			int half <- num_to_delete div 2;
+//    			
+//    			loop i from: 0 to: half - 1 { // first half convert to mixed
+//    				do change_farm_type(producing_farms[i], "mixed");
+//    			}
     			
-    			loop i from: 0 to: half - 1 { // first half convert to mixed
-    				do change_farm_type(producing_farms[i], "mixed");
-    			}
-    			
-    			loop i from: half to: num_to_convert - 1 {
-    				// update agricultural surface counters
-    				total_num_farms_A <- total_num_farms_A -1;
-    				total_surface_farms_A <- total_surface_farms_A - producing_farms[i].surface_m2;
+    			float to_delete_surface <- 0.0;
+    			loop i from: 0 to: num_to_delete - 1 {
+    				to_delete_surface <- to_delete_surface + producing_farms[i].surface_m2;
     				
     				ask producing_farms[i]{
     					do die;
     				}
-    				// TODO tell environment we're reducing our allocated surface
+    				
     			}
-    		} else if (ratio < 0.9) { // under production -> create farms
+    			
+    			write "Deleting " + (-to_delete_surface) + " m2 of " + p + " farms ...";
+    			// TODO tell environment we're reducing our allocated surface
+				
+		        /*ask agri_producer {
+		        	if (external_producers.keys contains "m² land"){
+		        		bool surface_liberated <- external_producers["m² land"].producer.produce(["m² land"::(-to_delete_surface)]);
+		        		if not surface_liberated {
+						    write "WARNING: Could not liberate " + to_delete_surface + " m² to environment";
+						}
+		        	} else {
+		        		write "ERROR: No external producer for 'm² land' configured!";
+		        	}
+		        }*/
+		        
+    			do clean_dead_farms();
+
+
+    		} else if (ratio < 0.95) { // under production -> create farms
+    		
     			int num_to_create <- round(0.1 * length(producing_farms));
     			float avg_surface <- (max_farm_surface_m2 + min_farm_surface_m2) / 2;
-    			float total_new_surface <- num_to_create * avg_surface;
+    			float to_add_surface <- num_to_create * avg_surface;
     			
     			// check if there's available surface
     			bool surface_granted <- false ;
 		        ask agri_producer {
 		        	if (external_producers.keys contains "m² land"){
-		        		surface_granted <- external_producers["m² land"].producer.produce(["m² land"::total_new_surface]);
+		        		surface_granted <- external_producers["m² land"].producer.produce(["m² land"::to_add_surface]);
 		        	} else {
 		        		write "ERROR: No external producer for 'm² land' configured!";
 		        	}
 		        }
 		        
 		        if (not surface_granted) {
-			        write "ERROR " + total_new_surface + " m² could not be allocated to extra farms";
+			        write "ERROR " + to_add_surface + " m² could not be allocated to extra farms";
 			        return;
 			    }
     			
+    			write "Adding " + to_add_surface + " m2 of " + p + " farms ...";
     			create farm number:  num_to_create with: [
     				farm_type::get_farm_type_for_product(p),
     				surface_m2::avg_surface
-    			];
+    			] returns: created_farms;
+    			farms_list <- farms_list + created_farms;
     			
-    			// update agricultural surface counters
-    			total_num_farms_A <- total_num_farms_A + num_to_create;
-    			total_surface_farms_A <- total_surface_farms_A + total_new_surface;
+    			// update farm data
+    			total_num_farms_A <- length(farms_list);
+    			total_surface_farms_A <- total_surface_farms_A + to_add_surface;
     		}
+    		
     	}
+    	
     }
     
     action change_farm_type(farm target_farm, string new_type){
@@ -468,6 +486,19 @@ species agricultural parent: bloc {
         }
     }
     
+    /* Checks for dead instances of farm in farms_list to remove and updates farm data */
+    action clean_dead_farms {
+        int initial_count <- length(farms_list);
+        farms_list <- farms_list where (each != nil and not dead(each));
+        
+        int removed_count <- initial_count - length(farms_list);
+        
+        if (removed_count > 0) {
+            //write "Cleaned " + removed_count + " dead farms from farms_list";
+            total_num_farms_A <- length(farms_list);
+            total_surface_farms_A <- farms_list sum_of (each.surface_m2);
+        }
+    }
     
     
     
@@ -689,9 +720,6 @@ species farm {
 		return emissions;
 	}
 	
-	bool farm_produces(string product){
-		return farm_type = product;
-	}
 	
 	/* ---- Méthodes ---- */
 	action compute_capacity {
@@ -769,7 +797,6 @@ species farm {
 experiment run_agricultural type: gui {
 	output {
 		monitor "Total number of farms" value: world.total_num_farms_A;
-		monitor "Total surface used by farms (m2)" value: world.total_surface_farms_A;
 		
 		display Products_information {
 			chart "Meat - Consumption vs. Production" type: series size: {0.5, 0.5} position: {0, 0} {
