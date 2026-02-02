@@ -162,7 +162,9 @@ global {
 		}
 
 		create energy number: 1;
-		create urbanplanning number: 1;
+		create urbanplanning number: 1{
+            mini_cities <- myself.mini_cities;
+        }
 		create transport number: 1 with:
 		// [use_gis::use_gis, mini_cities::mini_cities, main_cities::main_cities, city_population::city_population, nb_mini_cities_per_city::nb_mini_cities_per_city, mini_city_population::mini_city_population];
 		[mini_cities::mini_cities, main_cities::main_cities, city_population::city_population, nb_mini_cities_per_city::nb_mini_cities_per_city, mini_city_population::mini_city_population];
