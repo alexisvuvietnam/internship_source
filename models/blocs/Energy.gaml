@@ -57,8 +57,13 @@ global{
     
     //Ressources par infrastructures et par tick
 	map<string, map<string, float>> factory_ressource <- [
+		/*
+		"m² land":: ["nuclear"::1.0, "wind"::1.0, "hydro"::1.0, "solar"::1.0],
+	    "L water":: ["nuclear"::1.0, "wind"::1.0, "hydro"::1.0, "solar"::1.0]
+		*/
 	    "m² land":: ["nuclear"::1500000.0, "wind"::500.0, "hydro"::2000000.0, "solar"::20000.0],
-	    "L water":: ["nuclear"::800000.0, "wind"::50.0, "hydro"::5000000.0, "solar"::100.0]
+	    "L water":: ["nuclear"::0.0, "wind"::0.0, "hydro"::0.0, "solar"::0.0]
+	    /**/
 	];
     
     //Émissions par kWh (gCO2e)
@@ -176,7 +181,7 @@ species centrale_hydro parent: infrastructure {
 }
 
 species parc_eolien parent: infrastructure {
-    float wind_factor <- 1.0;
+    float wind_factor <- 0.8 + rnd(0.4);
     
     init {
         type <- "wind";
@@ -523,8 +528,8 @@ species energy parent:bloc{
 	    float xsurplus <- surplus;
 	    
 	    // Paramètres
-	    float TARGET_SURPLUS <- 1.5e7;
-	    float STABLE_BAND <- 3.0e7;
+	    float TARGET_SURPLUS <- 1.0e10;
+	    float STABLE_BAND <- 3.0e9;
 	    
 	    //Nombre d'infrastructures min
 	    map<string,int> min_capacity <- [
@@ -594,44 +599,39 @@ species energy parent:bloc{
 	    }
 	    
 	    //Sur production => On désactive des usines
-	    if (xsurplus > TARGET_SURPLUS + STABLE_BAND) {
-	        
-	        if (op_last_action = "build") {
-	            return;
-	        }
-	        
-	        //Trouver le type avec le plus grand écart mixeE/mixe réel
-	        string type_to_reduce <- nil;
-	        float max_excess <- 0.0;
-	        
-	        loop energy_type over: energy_types {
-	            float excess <- current_mix[energy_type] - mix_E[energy_type];
-	            
-	            //Verifier qu'on peut détruire
-	            int current_count <- 0;
-	            if (energy_type = "nuclear") { current_count <- length(reacteur select (each.operational)); }
-	            else if (energy_type = "hydro") { current_count <- length(centrale_hydro select (each.operational)); }
-	            else if (energy_type = "wind") { current_count <- length(parc_eolien select (each.operational)); }
-	            else if (energy_type = "solar") { current_count <- length(champ_solaire select (each.operational)); }
-	            
-	            if (excess > max_excess and current_count > min_capacity[energy_type]) {
-	                max_excess <- excess;
-	                type_to_reduce <- energy_type;
-	            }
-	        }
-	        
-	        if (type_to_reduce != nil) {
-	            int batch <- batch_size[type_to_reduce];
-	            
-	            loop times: batch {
-	                do remove_oldest_factory(type_to_reduce);
-	            }
-	            
-	            write "REDUCE " + type_to_reduce + " (excès=" + (max_excess*100.0) + "%): removed=" + batch;
-	            op_last_action <- "destroy";
-	            op_last_type <- type_to_reduce;
-	        }
-	    }
+		if (xsurplus > TARGET_SURPLUS + STABLE_BAND) {
+            //Trouver le type avec le plus grand écart positif
+            string type_to_reduce <- nil;
+            float max_excess <- 0.0;
+
+            loop energy_type over: energy_types {
+                float excess <- current_mix[energy_type] - mix_E[energy_type];
+
+                //Verifier qu'on peut détruire
+                map<string, int> operational_count <- [
+			        "nuclear" :: length(reacteur select (each.operational)),
+			        "hydro" :: length(centrale_hydro select (each.operational)),
+			        "wind" :: length(parc_eolien select (each.operational)),
+			        "solar" :: length(champ_solaire select (each.operational))
+			    ];
+                int current_count <- operational_count[energy_type];
+
+                if (excess > max_excess and current_count > min_capacity[energy_type]) {
+                    max_excess <- excess;
+                    type_to_reduce <- energy_type;
+                }
+            }
+
+            if (type_to_reduce != nil) {
+                int batch <- batch_size[type_to_reduce];
+
+                loop times: batch {
+                    do remove_oldest_factory(type_to_reduce);
+                }
+                op_last_action <- "destroy";
+                op_last_type <- type_to_reduce;
+            }
+        }
 	}
 }
 
