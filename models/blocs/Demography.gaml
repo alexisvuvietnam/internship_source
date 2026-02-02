@@ -46,6 +46,9 @@ global{
 	// Age pyramid data (aggregated from all cities)
 	map<string, int> global_age_pyramid <- [];
 	
+	// tracks the current food shortage impact on mortality
+	float shortage_mortality_factor <- 1.0; 
+	
 	init{  
 		// a security added to avoid launching an experiment without the other blocs
 		if (length(coordinator) = 0){
@@ -140,15 +143,41 @@ species residents parent:bloc{
 		return nil;
 	}
 	
-	/* Collect global statistics from all cities */
-	action collect_statistics{
-		total_births <- sum(mini_cities collect each.births_this_year);
-		total_deaths <- sum(mini_cities collect each.deaths_this_year);
+	action collect_last_tick_data{ // update stats & measures
+		int nb_men <- individual count(not dead(each) and each.gender = male_gender);
+		int nb_woman <-  individual count(not dead(each)) - nb_men;
 		
-		// Reset yearly counters
-		ask mini_cities {
-			births_this_year <- 0.0;
-			deaths_this_year <- 0.0;
+		// Update shortage mortality factor
+		float total_shortage_coeff <- 0.0;
+		int count_with_coeff <- 0;
+		ask individual where (not dead(each)) {
+			if (additional_attributes contains_key "shortage_mortality_coeff") {
+				total_shortage_coeff <- total_shortage_coeff + float(additional_attributes["shortage_mortality_coeff"]);
+				count_with_coeff <- count_with_coeff + 1;
+				
+			}
+		}
+		if (count_with_coeff > 0) {
+			shortage_mortality_factor <- total_shortage_coeff / count_with_coeff;
+		} else {
+			shortage_mortality_factor <- 1.0;
+		}
+	}
+	
+	action population_activity(list<human> pop){
+		 // no population activity for demography component (function declared only to respect bloc API)
+	}
+	
+	action set_external_producer(string product, production_agent prod_agent){
+		// no external producer for demography component (function declared only to respect bloc API)
+	}
+	
+	/* initialize the population */
+	action init_population{
+		create individual number:nb_init_individuals{
+			gender <- rnd_choice(init_gender_distrib); // override gender, pick a gender with respect to the real distribution
+			age <- rnd_choice(init_age_distrib[gender]);  // pick an initial age with respect to the real distribution and gender
+			do update_demog_probas;
 		}
 		
 		// Aggregate age pyramid
@@ -269,39 +298,39 @@ species mini_city_demography parent: mini_city {
 	}
 
 	
-	/**
-	 * Apply births based on female population and birth probabilities
-	 */
-	action apply_births {
-		float expected_births <- 0.0;
-		
-		// calculate expected births in each age category
-		loop age_cat over: age_categories {
-			int female_count <- gender_age_distribution[female_gender][age_cat];
-			float birth_prob <- birth_proba[female_gender][age_cat];
-			birth_prob <- birth_prob * coeff_birth;
-			
-			expected_births <- expected_births + (female_count * birth_prob);
+	/* returns the age category matching the age of the individual from a list */
+	int get_age_category(list<int> ages_categories){
+		int age_cat <- max(ages_categories where (each <= age)); // get the last age category with a lower bound inferior to the age
+		return age_cat;
+	}
+	
+	/* returns the probability for the individual to die this year + add food shortage coeff */
+	float get_p_death{ // compute monthly death probability of an individual
+		int age_cat <- get_age_category(death_proba[gender].keys);
+		//float p_death <-  death_proba[gender][age_cat];
+		//return  p_death * coeff_death;
+		float base_p_death <-  death_proba[gender][age_cat];
+
+		float shortage_coeff <- 1.0;
+		if (additional_attributes contains_key "shortage_mortality_coeff") {
+			shortage_coeff <- float(additional_attributes["shortage_mortality_coeff"]);
 		}
 		
-		// apply stochastic variation
-		int new_births <- int(expected_births) + (flip(expected_births - int(expected_births)) ? 1 : 0);
+		float new_p_death <- min([base_p_death * coeff_death * shortage_coeff,1.0]);
+		if shortage_coeff > 1.0{
+			if(flip(p_death)){ // every individual has a chance to die every month, or die by reaching max_age
+					deaths <- deaths +1;
+					do die;
+		}
+		}
 		
-		if new_births > 0 {
-			// add newborns (age 0)
-			int new_males <- int(new_births * init_gender_distrib[male_gender]);
-			int new_females <- new_births - new_males;
-			
-			males <- males + new_males;
-			females <- females + new_females;
-			pop <- pop + new_births;
-			
-			// add to age 0 category
-			age_distribution[0] <- (age_distribution[0]) + new_births;
-			gender_age_distribution[male_gender][0] <- (gender_age_distribution[male_gender][0]) + new_males;
-			gender_age_distribution[female_gender][0] <- (gender_age_distribution[female_gender][0]) + new_females;
-			
-			births_this_year <- births_this_year + new_births;
+		return new_p_death;
+	}
+	
+	/* returns the probability for the individual to give birth this year */
+	float get_p_birth{
+		if(gender = male_gender){ // male don't give birth
+			return 0.0;
 		}
 	}
 	

@@ -162,6 +162,7 @@ experiment main_experiment type: gui {
 		monitor "GES émis énergie" value: world.tick_emissions_E["gCO2e emissions"];
 		monitor "GES émis transport" value: world.tick_emissions_T["gCO2e emissions"];
 		monitor "GES absorbés par l'environnement" value: world.tick_absorbed_ECO["gCO2e emissions"];
+		monitor "Surface disponible totale" value: world.available_surface;
 
 		// Affichage de la consommation d'énergie
 		display "Répartition de la consommation d'énergie pour chaque secteur" type: 2d {
