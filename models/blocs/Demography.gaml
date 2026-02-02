@@ -202,8 +202,8 @@ species mini_city_demography parent: mini_city {
 	string male_gender;
 	int males <- 0;
 	int females <- 0;
-	int go_to_school <- 0;
-	int go_to_work <- 0;
+	int go_to_school;
+	int go_to_work;
 	
 	// age distribution: map from age category to count
 	map<int, int> age_distribution <- [];

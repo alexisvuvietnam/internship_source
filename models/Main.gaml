@@ -115,9 +115,7 @@ global {
 		create transport number: 1;
 
 		// L'environnement gère les mini-villes
-		create environnement number: 1 {
-			population <- population_size;
-		}
+		create environnement number: 1;
 
 		create coordinator number: 1;
 		ask coordinator {
