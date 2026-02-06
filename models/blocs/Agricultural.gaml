@@ -17,8 +17,9 @@ global {
 	list<string> production_inputs_A <- ["L water", "kWh energy", "m² land"];
 	list<string> production_emissions_A <- ["gCO2e emissions"];
 	list<string> production_perishables_A <- ["kg_meat", "kg_vegetables"];
-	int pop_size <- 10000; // number of agents
-	int prop_human <- 7000; // number of human an agent represents
+	
+	int pop_size;	// number of agents
+	int prop_human;		// number of human an agent represents
 	int tick_counter <- 0; // track month, we start in spring
 	//float total_surface_used_A <- 0.0;
 
@@ -126,6 +127,7 @@ species agricultural parent: bloc {
 		do collect_last_tick_data();
 		ask agri_producer {
 			do produce_from_farms(myself.farms_list);
+			do update_meat_stock();
 			do apply_perishing();
 		}
 
@@ -222,45 +224,49 @@ species agricultural parent: bloc {
 		}
 
 		ask agri_consumer { // produce the required quantities
-			float total_meat_demand <- consumed["kg_meat"];
-			float remaining_meat_demand <- max(0, total_meat_demand - kg_gibier_monthly);
-			agricultural agri_ref <- myself;
-			float max_mortality_coef <- 1.0;
+		
+			//float total_meat_demand <- consumed["kg_meat"];
+            //float remaining_meat_demand <- max(0, total_meat_demand - kg_gibier_monthly);
+            
+            agricultural agri_ref <- myself;
+            float max_mortality_coef <- 1.0;
+                        
 			ask agri_producer {
-				bool ok;
-				loop c over: myself.consumed.keys {
-					float demand_qty;
-					if (c = "kg_meat") {
-						demand_qty <- remaining_meat_demand;
-						ok <- produce(self.name, ["kg_meat"::remaining_meat_demand]);
-					} else {
-						demand_qty <- myself.consumed[c];
-						ok <- produce(self.name, [c::myself.consumed[c]]);
-					}
-
-					if not ok {
-						write "Pénurie de " + c;
-						float shortage_coef <- 0.0;
-						if (demand_qty > 0) {
-							if (products_stock[c] <= 0) {
-								shortage_coef <- 1.0;
-							} else if (products_stock[c] < demand_qty) {
-								shortage_coef <- (demand_qty - products_stock[c]) / demand_qty;
-							}
-
-						}
-
-						agri_ref.food_shortage[c] <- shortage_coef;
-
-						// Calcul new coeff (*5 to check)
-						if (shortage_coef > 0) {
-							float mortality_coef <- 1.0 + shortage_coef * 5;
-							max_mortality_coef <- max([max_mortality_coef, mortality_coef]);
-						}
-
-					}
-
-				}
+                bool ok;
+                loop c over: myself.consumed.keys {
+//                	float demand_qty;
+//                	if (c = "kg_meat"){
+//                		demand_qty <- remaining_meat_demand;
+//                		ok <- produce(["kg_meat"::remaining_meat_demand]);
+//                	} else {
+//                		demand_qty <- myself.consumed[c];
+//                		ok <- produce([c::myself.consumed[c]]);
+//                	}
+                	
+                	float demand_qty <- myself.consumed[c];
+                	ok <- produce([c::myself.consumed[c]]);
+                	
+            		if not ok {
+            			write "Pénurie de " + c ;
+            			
+            			float shortage_coef <- 0.0;
+            			if (demand_qty > 0) {
+            				if (products_stock[c] <= 0) {
+            					shortage_coef <- 1.0;
+            				} else if (products_stock[c] < demand_qty) {
+            					shortage_coef <- (demand_qty - products_stock[c]) / demand_qty;
+            				}
+            			}
+            			
+            			agri_ref.food_shortage[c] <- shortage_coef;
+            			
+            			// Calcul new coeff (*5 to check)
+            			if (shortage_coef > 0) {
+            				float mortality_coef <- 1.0 + shortage_coef*5;
+            				max_mortality_coef <- max([max_mortality_coef, mortality_coef]);
+            			}
+            		}
+                }
 
 			}
 			// Apply coeff to humans
@@ -278,11 +284,38 @@ species agricultural parent: bloc {
 	// ----- actions for init creation of farms -----
 	action calculate_initial_farms {
 		write "Pop size used for init demand " + pop_size;
-		write "Prop human used for init " + prop_human;
-		float monthly_meat_demand_total <- individual_consumption_A["kg_meat"] * pop_size * prop_human;
-		float monthly_meat_demand_farms <- max(0, monthly_meat_demand_total - kg_gibier_monthly);
-		float monthly_veg_demand <- individual_consumption_A["kg_vegetables"] * pop_size * prop_human;
-		float init_monthly_cotton_demand <- 50000 * 1e3; // hypothèse : init de 50 000 tonnes
+		write "Prop human used for init "+ prop_human;
+        float monthly_meat_demand_total <- individual_consumption_A["kg_meat"] * pop_size * prop_human;
+        float monthly_meat_demand_farms <- max(0, monthly_meat_demand_total - kg_gibier_monthly);
+        float monthly_veg_demand <- individual_consumption_A["kg_vegetables"] * pop_size * prop_human;
+        float init_monthly_cotton_demand <- 50000 * 1e3; // hypothèse : init de 50 000 tonnes
+        
+        // Calculate surface needed (with safety margin of 10%)
+        float safety_margin <- 1.0;
+        float surface_needed_meat <- monthly_meat_demand_farms * production_output_inputs_A["kg_meat"]["m² land"] * safety_margin;
+        float surface_needed_veg <- monthly_veg_demand * production_output_inputs_A["kg_vegetables"]["m² land"] * safety_margin;
+        float surface_needed_cotton <- init_monthly_cotton_demand * production_output_inputs_A["kg_cotton"]["m² land"] * safety_margin;
+        float total_surface_needed <- surface_needed_meat + surface_needed_veg + surface_needed_cotton;
+        
+        // Calculate number of farms needed
+        int nb_farms_needed <- int(ceil(total_surface_needed / max_farm_surface_m2));
+        
+        // Ensure minimum number of farms for diversity
+        if (nb_farms_needed < 4) {
+            nb_farms_needed <- 4;
+        }
+        
+        write "Agricultural setup: Creating " + nb_farms_needed + " farms";
+        write "  - Total surface needed: " + total_surface_needed + " m²";
+        write "  - Meat demand: " + monthly_meat_demand_total + " kg/month";
+        write "    - Origin farms: " + round((monthly_meat_demand_farms/monthly_meat_demand_total) * 100) + " %";
+        write "    - Origin gibier: " + round((kg_gibier_monthly/monthly_meat_demand_total) * 100) + " %";
+        write "  - Vegetables demand: " + monthly_veg_demand + " kg/month";
+        write "  - Cotton demand: " + init_monthly_cotton_demand + " kg/month";
+        
+        // Create farms with appropriate types and sizes
+        do create_initial_farms(nb_farms_needed, surface_needed_meat, surface_needed_veg, surface_needed_cotton);
+    }
 
 		// Calculate surface needed (with safety margin of 10%)
 		float safety_margin <- 1.0;
@@ -662,8 +695,13 @@ species agricultural parent: bloc {
 			}
 
 		}
-
-		/* Applies  */
+		
+		/* Adds the constant availability of meat form gibier */
+		action update_meat_stock {
+			products_stock["kg_meat"] <- products_stock["kg_meat"] + kg_gibier_monthly;
+		}
+		
+		/* Applies perishing rate to stock */
 		action apply_perishing {
 			loop p over: production_perishables_A {
 				tick_waste[p] <- products_stock[p] * perish_rate[p];
@@ -812,6 +850,8 @@ species farm {
 experiment run_agricultural type: gui {
 	output {
 		monitor "Total number of farms" value: world.total_num_farms_A;
+		monitor "Number of individual agents" value: pop_size;
+		
 		display Products_information {
 			chart "Meat - Consumption vs. Production" type: series size: {0.5, 0.5} position: {0, 0} {
 				data "Consumption" value: tick_pop_consumption_A["kg_meat"] color: #violet;
