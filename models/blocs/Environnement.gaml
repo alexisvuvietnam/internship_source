@@ -100,7 +100,7 @@ species environnement parent: bloc {
 			tick_production_ECO <- producer.get_tick_outputs_produced(); // collect production
 			tick_absorbed_ECO <- producer.get_tick_emissions(); // collect emissions
 			//			write "tick_production_ECO: " + tick_production_ECO;
-						//write "tick_absorded_ECO: " + tick_absorbed_ECO;
+			//write "tick_absorded_ECO: " + tick_absorbed_ECO;
 			ask eco_producer { // prepare next tick on producer side
 				do reset_tick_counters;
 			}
@@ -140,7 +140,7 @@ species environnement parent: bloc {
 		}
 
 		/******** PRODUCTION DE RESSOURCES (DEMANDES DES AUTRES SECTEURS) ********/
-		bool produce (map<string, float> demand) {
+		bool produce (string buyer, map<string, float> demand) {
 			loop r over: demand.keys {
 				float qty <- demand[r];
 
@@ -177,16 +177,27 @@ species environnement parent: bloc {
 					} else {
 						return false; // stock d'eau insuffisant
 					}
+
 				}
 
 				/* Attribution de la surface */
 				if (r = "m² land") {
-					if (available_surface >= qty) {
-						available_surface <- available_surface - qty;
-						used_surface <- used_surface + qty;
+					if (qty > 0) {
+						if (available_surface >= qty) {
+							available_surface <- available_surface - qty;
+							used_surface <- used_surface + qty;
+							tick_production[r] <- tick_production[r] + qty;
+						} else {
+							return false; // Plus de surface
+						}
+
+					} else if (qty < 0) {
+						write "*** Bloc qui libère la surface : " + buyer + " ***";
+						// Libération de surface (qty négatif)
+						float qty_to_free <- abs(qty);
+						available_surface <- available_surface + qty_to_free;
+						used_surface <- used_surface - qty_to_free;
 						tick_production[r] <- tick_production[r] + qty;
-					} else {
-						return false; // Plus de surface
 					}
 
 				}
