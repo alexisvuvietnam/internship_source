@@ -96,7 +96,7 @@ species agricultural parent: bloc {
 	list<farm> farms_list;
 	float max_farm_surface_m2 <- 70.0 * 1e4; //taille moyenne en france 70 ha 2020
 	float min_farm_surface_m2 <- 35.0 * 1e4;
-
+	
 	// Farm distribution parameters
 	float meat_farm_ratio <- 0.25;
 	float veg_farm_ratio <- 0.35;
