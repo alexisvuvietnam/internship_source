@@ -33,8 +33,8 @@ global {
 	"taxi" :: ["kWh energy" :: 265.0, "kg plastic" :: 180.0]];
 	map<string, map<string, float>> production_output_emissions_T <- 
 	["minibus" :: ["gCO2e emissions" :: 1856000.0],
-	"tgv" :: ["gCO2e emissions" :: 36193.0],
-	"ter" :: ["gCO2e emissions" :: 22276.0],
+	"tgv" :: ["gCO2e emissions" :: 36193000.0],
+	"ter" :: ["gCO2e emissions" :: 22276000.0],
 	"bike" :: ["gCO2e emissions" :: 775.0],
 	"taxi" :: ["gCO2e emissions" :: 140000.0]];
 	
