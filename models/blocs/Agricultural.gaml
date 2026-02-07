@@ -189,6 +189,7 @@ species agricultural parent: bloc {
 			tick_emissions_A <- producer.get_tick_emissions(); // collect emissions
 			products_stock_A <- producer.get_products_stock(); // collect stock
 			tick_waste_A <- producer.get_tick_waste();
+			
 						
 			if (tick_counter != 11) { // to collect anual data
 				do update_anual_data_with_tick();
@@ -611,7 +612,6 @@ species agricultural parent: bloc {
 
 		/* Checks if we are answering the demand with our stocks (also contains production of the tick) */
 		bool produce (string buyer, map<string, float> demand) {
-			//write "***** BUYER : " + buyer + ": " + demand + " *****";
 			bool ok <- true;
 			loop c over: demand.keys {
 				if (products_stock[c] >= demand[c]) {
@@ -619,12 +619,13 @@ species agricultural parent: bloc {
 					
 					// Track cotton sales by buyer
 					if (c = "kg_cotton" and demand[c] > 0.0) {
+						write "***** BUYER : " + buyer + ": " + demand + " *****";
 						if (cotton_buyers_A.keys contains buyer) {
 							cotton_buyers_A[buyer] <- cotton_buyers_A[buyer] + demand[c];
 						} else {
 							cotton_buyers_A[buyer] <- demand[c];
 						}
-						write "***** Coton buyer log :" + cotton_buyers_A;
+						//write "***** Coton buyer log :" + cotton_buyers_A;
 					}
 				} else {
 					ok <- false;
@@ -647,7 +648,7 @@ species agricultural parent: bloc {
 							if not available {
 							// TODO implement partial availability (penurie case)
 								quota_received <- 0.0;
-								write "PRODUCTION : Farm " + name + " " + farm_type + " cannot get " + ressource + " for " + product;
+								//write "PRODUCTION : Farm " + name + " " + farm_type + " cannot get " + ressource + " for " + product;
 							} else {
 								myself.tick_resources_used[ressource] <- myself.tick_resources_used[ressource] + qty_needed;
 							}
@@ -835,6 +836,7 @@ species farm {
  * If needed, a new experiment combining all those displays should be added, for example in the Main code of the simulation.
  */
 experiment run_agricultural type: gui {
+	
 	output {
 		monitor "Total number of farms" value: world.total_num_farms_A;
 		monitor "Number of individual agents" value: pop_size;
@@ -859,14 +861,13 @@ experiment run_agricultural type: gui {
 				data "kg_vegetables" value: products_stock_A["kg_vegetables"] color: #blue;
 				data "kg_cotton" value: products_stock_A["kg_cotton"] color: #lime;
 			}
-
 		}
 
 		display Cotton_Buyers type: 2d{
-			chart "Cotton Buyers Proportion" type: series size: {1.0, 1.0} {
-				loop buyer over: cotton_buyers_A.keys {
-					data buyer value: cotton_buyers_A[buyer];
-				}
+			chart "Cotton Buyers Proportion" type: pie size: {1.0, 1.0} {
+				data "Energy" value: cotton_buyers_A["energy0"];
+//				data "Urbanism" value: cotton_buyers_A["urbanplanning0"];
+//				data "Transport" value: cotton_buyers_A["transport0"];
 			}
 		}
 

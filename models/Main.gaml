@@ -243,7 +243,6 @@ experiment main_experiment type: gui {
 		// Les agents de la simulation
 		monitor "Nombre d'agents total" value: length(world.agents);
 		monitor "Nombre d'agents par type" value: counts;
-		monitor "Bloc faisant demandes de coton" value: cotton_buyers_A["energy0"];
 
 		// Energy consumption displays
 		display "Répartition de la consommation d'énergie pour chaque secteur" type: 2d {
