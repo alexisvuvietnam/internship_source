@@ -35,16 +35,16 @@ species bloc {
  * See the example blocs supplied alongside the API for more details.
  */
 species production_agent {
-	
-	float proba_vacation <- 0.33;//Approximately one over three days per years are day-off. 
+	float proba_vacation <- 0.33; //Approximately one over three days per years are day-off. 
 	bool is_day_off <- false;
-	
+
 	reflex go_to_work {
 		is_day_off <- flip(proba_vacation);
 	}
 
-/* Produce the given resources in the requested quantities. Return true in case of success. */
-	action produce (map<string, float> demand) virtual: true type: bool;
+	/* Produce the given resources in the requested quantities. Return true in case of success. 
+	 * buyer est l'entité qui demande, demand est un couple <ressource, quantité>. */
+	action produce (string buyer, map<string, float> demand) virtual: true type: bool;
 
 	/* Returns all the resources used for the production this tick */
 	action get_tick_inputs_used virtual: true type: map<string, float>;
@@ -247,7 +247,7 @@ species main_city {
 	string city_name;
 	int city_population <- 0;
 	list<mini_city> mini_cities_list;
-	
+
 	// --- GIS
 	aspect base {
 		draw circle(1000) color: #darkgray border: #black;
@@ -268,24 +268,19 @@ species mini_city {
 	float surface <- radius * radius * 3.14; // Calcul de la surface
 	int pop <- 0 min: 40 max: 50000; // de 40 à 50000 habitants
 	list<mini_city> connected_mini_cities;
-	
+
 	// Urbanisme
 	map<string, float> building_supply <- [];
 	map<string, float> potential_building_supply <- [];
-	
 	map<string, float> demand <- [];
 	map<string, float> shortage <- [];
 	map<string, list> building_queue <- [];
-	
-	
 	map<string, float> tick_resources_used <- [];
 	map<string, float> tick_production <- [];
 	map<string, float> tick_emissions <- [];
 	map<string, float> tick_demand <- [];
-	
 	int go_to_school;
 	int go_to_work;
-	
 
 	// --- GIS
 	int degree update: length(connected_mini_cities);
@@ -301,6 +296,7 @@ species mini_city {
 		draw circle(radius) color: #white border: #black;
 		draw string(degree) color: #black size: 14 font: font("Arial", 14, #bold);
 	}
+
 }
 
 

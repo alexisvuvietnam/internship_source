@@ -84,7 +84,8 @@ global {
 	int nb_mini_cities <- length(mini_city);
 	bool use_gis <- true;
 	float step <- 1 #month;
-	bool enable_demography <- true;
+	bool enable_demography <- true; // TODO supprimer cette ligne
+	map<string, int> counts; // Compte le nombre d'agents de chaque type
 
 	// GIS files
 	file shape_file_cities <- file("../includes/shapefiles/cities_france.shp");
@@ -157,14 +158,15 @@ global {
 
 		// Other blocs can access population through mini_cities or total population
 		create agricultural number: 1 {
-			pop_size <- population_size;
-			prop_human <- round(7 * 1e7 / pop_size);
+			pop_size <- int(population_size / 100);
+			prop_human <- 100;
 		}
 
 		create energy number: 1;
-		create urbanplanning number: 1{
-            mini_cities <- myself.mini_cities;
-        }
+		create urbanplanning number: 1 {
+			mini_cities <- myself.mini_cities;
+		}
+
 		create transport number: 1 with:
 		// [use_gis::use_gis, mini_cities::mini_cities, main_cities::main_cities, city_population::city_population, nb_mini_cities_per_city::nb_mini_cities_per_city, mini_city_population::mini_city_population];
 		[mini_cities::mini_cities, main_cities::main_cities, city_population::city_population, nb_mini_cities_per_city::nb_mini_cities_per_city, mini_city_population::mini_city_population];
@@ -176,6 +178,15 @@ global {
 		ask coordinator {
 			do register_all_blocs;
 			do start;
+		}
+
+	}
+
+	reflex update_agents_species {
+		counts <- [];
+		loop ag over: world.agents {
+			string s <- species(ag);
+			counts[s] <- counts[s] + 1;
 		}
 
 	}
@@ -228,6 +239,10 @@ experiment main_experiment type: gui {
 		monitor "GES émis transport" value: world.tick_emissions_T["gCO2e emissions"];
 		monitor "GES absorbés par l'environnement" value: world.tick_absorbed_ECO["gCO2e emissions"];
 		monitor "Surface disponible totale" value: world.available_surface;
+
+		// Les agents de la simulation
+		monitor "Nombre d'agents total" value: length(world.agents);
+		monitor "Nombre d'agents par type" value: counts;
 
 		// Energy consumption displays
 		display "Répartition de la consommation d'énergie pour chaque secteur" type: 2d {

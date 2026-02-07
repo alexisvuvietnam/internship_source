@@ -26,11 +26,14 @@ global {
 	// Stock d'eau renouvelable : basé sur les précipitations annuelles (~440 milliards m3/an)
 	// Convertir en litres et prendre une part utilisable (environ 20% après évapotranspiration)
 	float stock_water <- 88e12; // 88 000 milliards de litres (stock annuel renouvelable utilisable)
-	float total_surface <- 5.44e11; // Surface de la France métropolitaine en m2
-	float forest_surface <- 1.71e11; // La forêt correspond à 171 000 km2 (m2)
+	map<string, float> used_water <- []; // Consommation d'eau pour chaque secteur
+
+	/* Gestion de la surface */
+	float total_surface <- 5.44e11 / 100.0; // Surface de la France métropolitaine en m2 (on divise par 100 comme pour le nombre d'habitant)
+	float forest_surface <- 1.71e11 / 100.0; // La forêt correspond à 171 000 km2 (m2)
 	/*  Surface dispo pour les autres secteurs  après avoir retiré la surface de la forêt de base */
 	float available_surface <- total_surface - forest_surface;
-	float used_surface <- 0.0; // Surface utilisée par les autres secteurs
+	map<string, float> used_surface <- []; // Surface utilisée par les autres secteurs
 
 	/* Production annuelle convertie en production mensuelle*/
 	float prod_wood <- 87800000 / 12; //environ 7 millions de m3
@@ -100,7 +103,7 @@ species environnement parent: bloc {
 			tick_production_ECO <- producer.get_tick_outputs_produced(); // collect production
 			tick_absorbed_ECO <- producer.get_tick_emissions(); // collect emissions
 			//			write "tick_production_ECO: " + tick_production_ECO;
-						//write "tick_absorded_ECO: " + tick_absorbed_ECO;
+			//write "tick_absorded_ECO: " + tick_absorbed_ECO;
 			ask eco_producer { // prepare next tick on producer side
 				do reset_tick_counters;
 			}
@@ -140,7 +143,7 @@ species environnement parent: bloc {
 		}
 
 		/******** PRODUCTION DE RESSOURCES (DEMANDES DES AUTRES SECTEURS) ********/
-		bool produce (map<string, float> demand) {
+		bool produce (string buyer, map<string, float> demand) {
 			loop r over: demand.keys {
 				float qty <- demand[r];
 
@@ -171,22 +174,41 @@ species environnement parent: bloc {
 
 				/* Production d’eau */
 				if (r = "L water") {
+					if (buyer contains "farm") {
+						used_water["farms"] <- qty;
+					} else if (buyer contains "energy") {
+						used_water["energy"] <- qty;
+					} else {
+						used_water[buyer] <- qty;
+					}
+
 					if (stock_water >= qty) {
 						stock_water <- stock_water - qty;
 						tick_production[r] <- tick_production[r] + qty;
 					} else {
 						return false; // stock d'eau insuffisant
 					}
+
 				}
 
 				/* Attribution de la surface */
 				if (r = "m² land") {
-					if (available_surface >= qty) {
-						available_surface <- available_surface - qty;
-						used_surface <- used_surface + qty;
+				//					write "*** Bloc qui demande de la surface : " + buyer + " ***";
+					if (qty > 0) {
+						if (available_surface >= qty) {
+							available_surface <- available_surface - qty;
+							used_surface[buyer] <- used_surface[buyer] + qty;
+							tick_production[r] <- tick_production[r] + qty;
+						} else {
+							return false; // Plus de surface
+						}
+
+					} else if (qty < 0) {
+					// Libération de surface (qty négatif)
+						float qty_to_free <- abs(qty);
+						available_surface <- available_surface + qty_to_free;
+						used_surface[buyer] <- used_surface[buyer] - qty_to_free;
 						tick_production[r] <- tick_production[r] + qty;
-					} else {
-						return false; // Plus de surface
 					}
 
 				}
@@ -273,7 +295,9 @@ experiment run_ecosystem type: gui {
 			}
 
 			chart "Quantité d'utilisation d'eau à chaque tick" type: series size: {0.5, 0.5} position: {0.5, 0} {
-				data "Eau" value: tick_production_ECO["L water"] color: #aqua;
+			// data "Eau" value: tick_production_ECO["L water"] color: #aqua;
+				data "Fermes" value: used_water["farms"] color: #brown;
+				data "Infrastructures énergétiques" value: used_water["energy"] color: #orange;
 			}
 
 			chart "Quantité de GES absorbée à chaque tick" type: series size: {0.5, 0.5} position: {0.5, 0.5} {
@@ -290,7 +314,9 @@ experiment run_ecosystem type: gui {
 			chart "Utilisation de la surface pour chaque secteur (en km2)" type: pie {
 				data "Forêt" value: forest_surface / 1e6 color: #green;
 				data "Dispo" value: available_surface / 1e6 color: #blue;
-				data "Autre" value: used_surface / 1E6 color: #gray;
+				data "Agriculture" value: used_surface["agri_producer0"] / 1E6 color: #brown;
+				data "Énergie" value: used_surface["energy0"] / 1E6 color: #orange;
+				data "Urbanisme" value: used_surface["urban_producer0"] / 1E6 color: #gray;
 			}
 
 		}

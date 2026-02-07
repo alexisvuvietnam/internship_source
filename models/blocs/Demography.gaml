@@ -45,6 +45,8 @@ global {
 
 	}
 
+	mini_city_demography mini_city_example; // Mini-ville exemple
+
 	/* Load gender data (distribution, probabilities) per age category from a csv file */
 	map<string, map<int, float>> load_gender_data (string filename) {
 		file input_file <- csv_file(filename, ","); // load the csv file and separate the columns
@@ -68,34 +70,74 @@ species residents parent: bloc {
 	int total_population <- nb_init_individuals; // TODO : paramètre à entrer pour l'utilisateur
 	int nb_ind_per_mini_city;
 	int nb_mini_cities; // Nombre total de mini-villes
+	list<string> population_needs <- ["kg_meat", "L water", "kg_vegetables"];
 
 	// Liste de toutes les mini-villes
+	list<mini_city> mini_cities_urban <- [];
 	list<mini_city_demography> mini_cities <- [];
+
+	init {
+		create mini_city_demography number: nb_mini_cities;
+	}
 
 	/* setup the resident agent : initialize the population */
 	action setup {
-	// do init_population;
+
+	// Initialisation des mini-villes
 		write "Population totale = " + total_population;
 		write "Nombre de mini-villes = " + nb_mini_cities;
 		nb_ind_per_mini_city <- int(total_population / nb_mini_cities);
 		write "Nombre d'individus par mini-villes dans setup " + nb_ind_per_mini_city;
 		do init_mini_cities;
+
+		// Enregistrement de la mini-ville exemple
+		mini_city_example <- mini_cities[0];
 	}
 
 	/* Initialisation des mini-villes */
 	action init_mini_cities {
-		create mini_city_demography number: nb_mini_cities {
+		ask mini_city_demography {
 		// write "Nombre d'individus par mini-ville dans init_mini_cities " + myself.nb_ind_per_mini_city;
 			self.nb_individuals <- myself.nb_ind_per_mini_city;
 			do init_population;
+
+			// Enregistrement de la ville dans la liste des mini-villes
+			myself.mini_cities <- myself.mini_cities + self;
 		}
 
+	}
+
+	list<mini_city_demography> get_mini_cities {
+		return mini_cities;
 	}
 
 	/* updates the population every tick */
 	action tick (list<human> pop) {
 		do collect_last_tick_data;
 		if (enabled) {
+
+		// Besoin total en viande
+			float total_meat_need <- 0.0;
+
+			// Besoin total en légumes
+			float total_vegetables_need <- 0.0;
+
+			// Besoin total en eau
+			float total_water_need <- 0.0;
+
+			// Parcourir toute les mini-villes
+			ask mini_city_demography {
+
+			// Capture les besoins en viande
+				total_meat_need <- total_meat_need + self.population_meat_need();
+
+				// Capture les besoins en légumes
+				total_vegetables_need <- total_vegetables_need + self.population_vegetables_need();
+
+				// Mettre à jour la population
+				self.pop <- length(self.individuals) * self.factor_individuals;
+			}
+
 			do update_births;
 			do update_deaths;
 			do increment_age;
@@ -104,7 +146,7 @@ species residents parent: bloc {
 	}
 
 	list<string> get_input_resources_labels {
-		return []; // no resources for demography component (function declared only to respect bloc API)
+		return [];
 	}
 
 	list<string> get_output_resources_labels {
@@ -120,10 +162,6 @@ species residents parent: bloc {
 		int nb_woman <- individual count (not dead(each)) - nb_men;
 	}
 
-	action population_activity (list<human> pop) {
-	// no population activity for demography component (function declared only to respect bloc API)
-	}
-
 	action set_external_producer (string product, production_agent prod_agent) {
 	// no external producer for demography component (function declared only to respect bloc API)
 	}
@@ -134,24 +172,36 @@ species residents parent: bloc {
 		ask individual {
 			if (ticks_before_birthday <= 0) { // check only once a year for each individual
 				if (gender = female_gender and flip(p_birth)) { // women can have children
-					new_births <- new_births + 1;
+					births <- births + 1;
+
+					// Un nouveau individu naît (pas de jumeau)
+					create individual number: 1 {
+
+					// Il vit dans la même ville que sa mère
+						self.my_city <- myself.my_city;
+
+						// Ajouter l'individu à la liste des individus de la ville
+						self.my_city.individuals <- self.my_city.individuals + self;
+					}
+
 				}
 
 			}
 
 		}
 
-		int nb_f <- individual count (each.gender = female_gender and not (dead(each)));
-		create individual number: new_births;
-		births <- births + new_births;
+		//		int nb_f <- individual count (each.gender = female_gender and not (dead(each)));
+		//		create individual number: new_births;
+		//		births <- births + new_births;
 	}
 
 	/* apply deaths*/
 	action update_deaths {
 		ask individual {
 			if (ticks_before_birthday <= 0) { // check only once a year for each individual
-				if (flip(p_death)) { // every individual has a chance to die every month, or die by reaching max_age
+				if (flip(self.p_death)) { // every individual has a chance to die every month, or die by reaching max_age
 					deaths <- deaths + 1;
+					remove item: self from: self.my_city.individuals; // Supprimer l'individu de sa ville
 					do die;
 				}
 
@@ -193,8 +243,17 @@ species individual parent: human {
 	int delay_next_child <- 0;
 	int child <- 0;
 	int nb_ind_real; // Nombre d'individus représentés réellement
+	bool has_house; // Est-ce que l'individu possède un logement
+	float meat_for_this_tick <- 0.0; // La quantité de viande que l'individu a mangé ce mois
+	float vegetables_for_this_tick <- 0.0; // La quantité de légumes que l'individu a mangé ce mois
+	mini_city_demography my_city; // Nom de la ville de l'agent
+
+	// Stress annuel qui augmente la proba de mourir d'un individu si les besoins de ce dernier
+	// ne sont pas répondus
+	float yearly_stress <- 0.0;
+
+	// Initialisation
 	init {
-	// write "INDIVIDU CRÉÉ !!!";
 		gender <- one_of([female_gender, male_gender]); // pick a gender randomly TODO : supprimer cette ligne
 		ticks_before_birthday <- rnd(nb_ticks_per_year); // set a random birth date in the year (uniformly)
 		// set initial birth & death probabilities :
@@ -208,13 +267,37 @@ species individual parent: human {
 		return age_cat;
 	}
 
-	/* returns the probability for the individual to die this year
-	 * Changer cette proba.
+	/* Probabilités d'un individu de mourir.
+	 * On suppose que le manque de nourriture n'influence que p_death.
 	 */
-	float get_p_death { // compute monthly death probability of an individual
+	float get_p_death {
 		int age_cat <- get_age_category(death_proba[gender].keys);
-		float p_death <- death_proba[gender][age_cat];
-		return p_death * coeff_death;
+		float p <- death_proba[gender][age_cat];
+		// p <- p * (1 + yearly_stress); Effet du logement et de l'alimentation
+		return min(p, 1.0) * coeff_death;
+	}
+
+	/* Mise à jour du stress annuel */
+	action update_monthly_stress {
+		float stress <- 0.0;
+
+		// Besoin en viande de l'individu
+		float meat <- self.meat_for_this_tick / self.get_meat_need();
+
+		// Besoin en légumes de l'individu
+		float vegetables <- self.vegetables_for_this_tick / self.get_vegetables_need();
+
+		// Besoin total en nourriture
+		float food <- (meat + vegetables) / 2.0;
+
+		// Est-ce que l'individu a une maison
+		if (!has_house) {
+			stress <- stress + 0.05;
+		}
+
+		// Influence des deux facteurs
+		stress <- stress + (1 - food) * 0.1;
+		yearly_stress <- yearly_stress + stress;
 	}
 
 	/* returns the probability for the individual to give birth this year */
@@ -234,16 +317,26 @@ species individual parent: human {
 		p_death <- get_p_death();
 	}
 
+	/* Besoin en viande d'un individu pour un  mois */
+	float get_meat_need {
+	// TODO à voir avec alimentation
+		return 2.0;
+	}
+
+	/* Besoin en légumes d'un individu pour un mois */
+	float get_vegetables_need {
+	// TODO à voir avec alimentation
+		return 15.0;
+	}
+
 }
 
 species mini_city_demography parent: mini_city {
 
-// Distribution de la population par genre et catégorie d'âge pour la mini-ville
-	map<string, map<int, int>> gender_age_distribution;
-
-	/*  Population de la mini-ville */
-	int nb_individuals; // Nombre d'individus réels (facteur x100)
-	int nb_agent_individuals;
+/*  Population de la mini-ville */
+	int nb_individuals; // Nombre d'individus réels
+	int factor_individuals <- 100; // Nombre d'individu représenté par un agent
+	list<individual> individuals <- [];
 
 	// Initialisation de la mini-ville
 	init {
@@ -251,22 +344,117 @@ species mini_city_demography parent: mini_city {
 		do init_population;
 	}
 
-	/* initialize the population */
+	/* Initialisation de la population */
 	action init_population {
-	// write "Initialisation de la population : pour l'instant ne fait rien";
 		if nb_individuals <= 0 {
-			write "Nombre d'individu nul !";
+		// write "Nombre d'individu nul !";
 		} else {
-			nb_agent_individuals <- int(nb_individuals / 100);
+			int nb_agent_individuals <- int(nb_individuals / factor_individuals); // Le nombre d'agents
 			create individual number: nb_agent_individuals {
 				gender <- rnd_choice(init_gender_distrib); // override gender, pick a gender with respect to the real distribution
-				// write "gender " + gender;
 				age <- rnd_choice(init_age_distrib[gender]); // pick an initial age with respect to the real distribution and gender
-				do update_demog_probas;
+				nb_ind_real <- myself.factor_individuals; // Le nombre d'individus que l'agent représente réellement
+				myself.individuals <- myself.individuals + self; // Ajout de l'individu à la liste des individus de la mini-ville
+				my_city <- myself;
+				do update_demog_probas; // Mettre à jour les probas de naissance et de décès
 			}
 
 		}
 
+	}
+
+	/* --- Consommation de viande de la mini-ville. --- */
+
+	/* Cette fonction retourne la quantité de viande en kg dont la population a besoin pour un mois. */
+	float population_meat_need {
+		float total_need <- 0.0;
+
+		// Parcourir tous les individus
+		loop ind over: self.individuals {
+		// Récupérer les besoins d'un individu
+			total_need <- total_need + ind.get_meat_need();
+		}
+
+		return total_need;
+	}
+
+	/* Cette fonction permet de nourrir la population de la ville de manière équitable entre tous les individus,
+	 * selon les besoins de chacun. Si cette dernière n'est pas suffisante,
+	 * la proba de mourir des individus augmente selon [TODO]. Retourne la nourriture en trop (nb négatif)
+	 * ou en moins (positif). */
+	float feed_population_meat (float meat_quantity) {
+		float total_quantity <- meat_quantity;
+		float diff <- total_quantity - self.population_meat_need(); // Nourriture en trop ou en moins
+
+		// La quantité de viande est supérieure à ce qui est demandé
+		if (diff < 0) {
+		// Tronquer pour avoir la quantité adéquate
+			total_quantity <- self.population_meat_need();
+		}
+
+		// Vérifier le pourcentage disponible
+		float prop_meat <- total_quantity / self.population_meat_need();
+
+		// Parcourir tous les individus
+		loop ind over: self.individuals {
+
+		// Récupérer les besoins de l'individu courant
+			float need <- ind.get_meat_need();
+
+			// Nourrir l'individu avec la quantité dispo proportionnellement à ses besoins
+			ind.meat_for_this_tick <- need * prop_meat;
+		}
+
+		return diff;
+	}
+
+	/* --- Consommation de légumes de la mini-ville. --- */
+
+	/* Cette fonction retourne la quantité de légumes en kg dont la population a besoin pour un mois. */
+	float population_vegetables_need {
+		float total_need <- 0.0;
+
+		// Parcourir tous les individus
+		loop ind over: self.individuals {
+		// Récupérer les besoins d'un individu
+			total_need <- total_need + ind.get_vegetables_need();
+		}
+
+		return total_need;
+	}
+
+	/* Cette fonction permet de nourrir la population de la ville de manière équitable entre tous les individus,
+	 * selon les besoins de chacun. Si cette dernière n'est pas suffisante,
+	 * la proba de mourir des individus augmente selon [TODO]. Retourne la nourriture en trop (nb négatif)
+	 * ou en moins (positif). */
+	float feed_population_vegetables (float vegetables_quantity) {
+		float total_quantity <- vegetables_quantity;
+		float diff <- total_quantity - self.population_vegetables_need(); // Nourriture en trop ou en moins
+
+		// La quantité de légumes est supérieure à ce qui est demandé
+		if (diff < 0) {
+		// Tronquer pour avoir la quantité adéquate
+			total_quantity <- self.population_vegetables_need();
+		}
+
+		// Vérifier le pourcentage disponible
+		float prop_vegetables <- total_quantity / self.population_vegetables_need();
+
+		// Parcourir tous les individus
+		loop ind over: self.individuals {
+
+		// Récupérer les besoins de l'individu courant
+			float need <- ind.get_vegetables_need();
+
+			// Nourrir l'individu avec la quantité dispo proportionnellement à ses besoins
+			ind.vegetables_for_this_tick <- need * prop_vegetables;
+		}
+
+		return diff;
+	}
+
+	/* Loger la population */
+	action population_housing {
 	}
 
 }
@@ -284,7 +472,7 @@ experiment run_demography type: gui {
 	parameter "Coefficient for death probability" var: coeff_death min: 0.0 max: 10.0 category: "Demography";
 	parameter "Number of ticks per year" var: nb_ticks_per_year min: 1 category: "Simulation";
 	output {
-		display Population_information {
+		display Population_information type: 2d {
 			chart "Gender evolution" type: series size: {0.5, 0.5} position: {0, 0} {
 				data "number_of_man" value: individual count (not dead(each) and each.gender = male_gender) color: #red;
 				data "number_of_woman" value: individual count (not dead(each) and each.gender = female_gender) color: #blue;
@@ -308,6 +496,8 @@ experiment run_demography type: gui {
 
 		}
 
+		monitor "Nombre de mini-villes" value: length(mini_city_demography);
+		monitor "Nombre d'agents dans la mini ville exemple" value: length(mini_city_example.individuals);
 	}
 
 }
