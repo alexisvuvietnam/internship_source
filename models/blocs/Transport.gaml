@@ -1030,37 +1030,32 @@ species transport_mode {
 	float prod_speed;
 	int prod_incr <- 0;
 
-	action update_available (float km_travelled, transport parent_transport) {
-		int to_add <- 0;
-		string product_name <- "";
-		switch (type) {
-			match "taxis" {
-				to_add <- world.production_vehicules["taxi"];
-				product_name <- "taxi";
-			}
-
-			match "tgvs" {
-				to_add <- world.production_vehicules["tgv"];
-				product_name <- "tgv";
-			}
-
-			match "ters" {
-				to_add <- world.production_vehicules["ter"];
-				product_name <- "ter";
-			}
-
-			match "minibuses" {
-				to_add <- world.production_vehicules["minibus"];
-				product_name <- "minibus";
-			}
-
-			match "bikes" {
-				to_add <- world.production_vehicules["bike"];
-				product_name <- "bike";
-			}
-
-		}
-
+	action update_available(float km_travelled, transport parent_transport){
+	    int to_add <- 0;
+	    string product_name <- "";
+	
+	    switch(type) {
+	        match "taxis" {
+	            to_add <- world.production_vehicules["taxi"];
+	            product_name <- "taxi";
+	        }
+	        match "tgvs" {
+	            to_add <- world.production_vehicules["tgv"];
+	            product_name <- "tgv";
+	        }
+	        match "ters" {
+	            to_add <- world.production_vehicules["ter"];
+	            product_name <- "ter";
+	        }
+	        match "minibuses" {
+	            to_add <- world.production_vehicules["minibus"];
+	            product_name <- "minibus";
+	        }
+	        match "bikes" {
+	            to_add <- world.production_vehicules["bike"];
+	            product_name <- "bike";
+	        }
+	    }
 		if (parent_transport != nil and product_name != "") {
 		    float usage <- transport_usage[world.mode_to_trip[product_name] ];
 			// write type+": "+number_available;
