@@ -32,7 +32,7 @@ global {
 	float kg_mouflon <- 3000 * 37.5 / 12;
 	float kg_daim <- 2000 * 60.0 / 12;
 	float kg_csika <- 80 * 50.0 / 12;
-	float kg_gibier_monthly <- kg_sanglier + kg_cerf + kg_chevreuil + kg_chamois + kg_isard + kg_mouflon + kg_daim + kg_csika;
+	float kg_gibier_monthly;
 
 	/* Production data */
 	map<string, map<string, float>>
@@ -119,6 +119,12 @@ species agricultural parent: bloc {
 		create agri_consumer number: 1 returns: consumers; // instanciate the agricultural consumption handler
 		producer <- first(producers);
 		consumer <- first(consumers);
+		
+		if (prop_human = 100) {
+			kg_gibier_monthly <- 0.0;
+		} else {
+			kg_gibier_monthly <- kg_sanglier + kg_cerf + kg_chevreuil + kg_chamois + kg_isard + kg_mouflon + kg_daim + kg_csika;
+		}
 	}
 
 	/* Actions order in each tick
@@ -191,7 +197,7 @@ species agricultural parent: bloc {
 			tick_waste_A <- producer.get_tick_waste();
 			//cotton_buyers_A <- producer.get_cotton_buyers(); // collect cotton buyers data
 			
-			write "***** Collect last tick " + cotton_buyers_A;
+			//write "***** Collect last tick " + cotton_buyers_A;
 						
 			if (tick_counter != 11) { // to collect anual data
 				do update_anual_data_with_tick();
@@ -330,8 +336,8 @@ species agricultural parent: bloc {
 		int nb_cotton_farms <- max(1, int(cotton_surface/max_farm_surface_m2));
 		
 		// Add mixed farms for diversity and works also as margin
-		int total_specialised <- nb_meat_farms + nb_veg_farms;
-		int nb_mixed_farms <- max(1, int(total_specialised * 0.2));
+		int total_alim <- nb_meat_farms + nb_veg_farms;
+		int nb_mixed_farms <- max(1, int(total_alim * 0.2));
 		float mixed_surface <- nb_mixed_farms * max_farm_surface_m2;
 		
 
@@ -401,7 +407,7 @@ species agricultural parent: bloc {
 
 	/* Depending on production/consumption ratio we delete farms or add */
 	action update_farms_list {
-		map<string, float> upper_threshold <- ["kg_meat"::1.1, "kg_vegetables"::1.3];
+		map<string, float> upper_threshold <- ["kg_meat"::1.2, "kg_vegetables"::1.4];
 		loop p over: individual_consumption_A.keys {
 			float ratio <- anual_production_A[p] / anual_pop_consumption_A[p];
 
@@ -414,30 +420,32 @@ species agricultural parent: bloc {
 				//    				do change_farm_type(producing_farms[i], "mixed");
 				//    			}
 				float to_delete_surface <- 0.0;
-				loop i from: 0 to: num_to_delete - 1 {
-					to_delete_surface <- to_delete_surface + producing_farms[i].surface_m2;
-					ask producing_farms[i] {
-						do die;
-					}
-
-				}
-
-				write "Deleting " + (-to_delete_surface) + " m2 of " + p + " farms ...";
-				// TODO tell environment we're reducing our allocated surface
-				ask agri_producer {
-					if (external_producers.keys contains "m² land") {
-						bool surface_liberated <- external_producers["m² land"].producer.produce(self.name, ["m² land"::(-to_delete_surface)]);
-						if not surface_liberated {
-							write "WARNING: Could not liberate " + to_delete_surface + " m² to environment";
+				if (num_to_delete > 0) {
+					loop i from: 0 to: num_to_delete - 1 {
+						to_delete_surface <- to_delete_surface + producing_farms[i].surface_m2;
+						ask producing_farms[i] {
+							do die;
 						}
-
-					} else {
-						write "ERROR: No external producer for 'm² land' configured!";
+	
 					}
-
+	
+					write "Deleting " + (-to_delete_surface) + " m2 of " + p + " farms ...";
+					// TODO tell environment we're reducing our allocated surface
+					ask agri_producer {
+						if (external_producers.keys contains "m² land") {
+							bool surface_liberated <- external_producers["m² land"].producer.produce(self.name, ["m² land"::(-to_delete_surface)]);
+							if not surface_liberated {
+								write "WARNING: Could not liberate " + to_delete_surface + " m² to environment";
+							}
+	
+						} else {
+							write "ERROR: No external producer for 'm² land' configured!";
+						}
+	
+					}
+	
+					do clean_dead_farms();
 				}
-
-				do clean_dead_farms();
 			} else if (ratio < 0.95) { // under production -> create farms
 				int num_to_create <- round(0.1 * length(producing_farms));
 				float avg_surface <- (max_farm_surface_m2 + min_farm_surface_m2) / 2;
@@ -771,8 +779,8 @@ species farm {
 		}
 
 		if (farm_type = "mixed") {
-			production_capacity["kg_meat"] <- surface_m2 * 0.2 * kg_per_m2["kg_meat"];
-			production_capacity["kg_vegetables"] <- surface_m2 * 0.8 * kg_per_m2["kg_vegetables"];
+			production_capacity["kg_meat"] <- surface_m2 * 0.9 * kg_per_m2["kg_meat"];
+			production_capacity["kg_vegetables"] <- surface_m2 * 0.1 * kg_per_m2["kg_vegetables"];
 		}
 
 	}
