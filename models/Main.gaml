@@ -159,7 +159,7 @@ global {
 		// Other blocs can access population through mini_cities or total population
 		create agricultural number: 1 {
 			pop_size <- int(population_size/100);
-			prop_human <- 10000;
+			prop_human <- 100;
 		}
 
 		create energy number: 1;
@@ -243,6 +243,7 @@ experiment main_experiment type: gui {
 		// Les agents de la simulation
 		monitor "Nombre d'agents total" value: length(world.agents);
 		monitor "Nombre d'agents par type" value: counts;
+		monitor "Bloc faisant demandes de coton" value: cotton_buyers_A["energy0"];
 
 		// Energy consumption displays
 		display "Répartition de la consommation d'énergie pour chaque secteur" type: 2d {

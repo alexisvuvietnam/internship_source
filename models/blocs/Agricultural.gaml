@@ -99,15 +99,9 @@ species agricultural parent: bloc {
 	agri_consumer consumer <- nil;
 
 	/* ----- MICRO VAR ----- */
-	list<farm> farms_list;
+	list<farm> farms_list <- [];
 	float max_farm_surface_m2 <- 70.0 * 1e4; //taille moyenne en france 70 ha 2020
 	float min_farm_surface_m2 <- 35.0 * 1e4;
-	
-	// Farm distribution parameters
-//	float meat_farm_ratio <- 0.25;
-//	float veg_farm_ratio <- 0.35;
-//	float mixed_farm_ratio <- 0.2;
-//	float cotton_farm_ratio <- 0.2;
 
 	/* Shortage tracking (0 = no shortage; 1 = complete shortage) */
 	map<string, float> food_shortage <- ["kg_meat"::0.0, "kg_vegetables"::0.0];
@@ -195,9 +189,6 @@ species agricultural parent: bloc {
 			tick_emissions_A <- producer.get_tick_emissions(); // collect emissions
 			products_stock_A <- producer.get_products_stock(); // collect stock
 			tick_waste_A <- producer.get_tick_waste();
-			//cotton_buyers_A <- producer.get_cotton_buyers(); // collect cotton buyers data
-			
-			//write "***** Collect last tick " + cotton_buyers_A;
 						
 			if (tick_counter != 11) { // to collect anual data
 				do update_anual_data_with_tick();
@@ -409,7 +400,13 @@ species agricultural parent: bloc {
 	action update_farms_list {
 		map<string, float> upper_threshold <- ["kg_meat"::1.2, "kg_vegetables"::1.4];
 		loop p over: individual_consumption_A.keys {
-			float ratio <- anual_production_A[p] / anual_pop_consumption_A[p];
+			float ratio;
+			if (anual_pop_consumption_A[p] > 0){
+				ratio <- anual_production_A[p] / anual_pop_consumption_A[p];
+			} else {
+				write "ERROR : annual consomption is equal to 0 !";
+				return ;
+			}
 
 			list<farm> producing_farms <- farms_list where (each.farm_type = get_farm_type_for_product(p));
 			if (ratio > upper_threshold[p]) { // over production -> change type farm or delete them
@@ -430,7 +427,6 @@ species agricultural parent: bloc {
 					}
 	
 					write "Deleting " + (-to_delete_surface) + " m2 of " + p + " farms ...";
-					// TODO tell environment we're reducing our allocated surface
 					ask agri_producer {
 						if (external_producers.keys contains "m² land") {
 							bool surface_liberated <- external_producers["m² land"].producer.produce(self.name, ["m² land"::(-to_delete_surface)]);
@@ -451,29 +447,35 @@ species agricultural parent: bloc {
 				float avg_surface <- (max_farm_surface_m2 + min_farm_surface_m2) / 2;
 				float to_add_surface <- num_to_create * avg_surface;
 
-				// check if there's available surface
-				bool surface_granted <- false;
-				ask agri_producer {
-					if (external_producers.keys contains "m² land") {
-						surface_granted <- external_producers["m² land"].producer.produce(self.name, ["m² land"::to_add_surface]);
-					} else {
-						write "ERROR: No external producer for 'm² land' configured!";
+				if (num_to_create > 0 ){
+					
+					// check if there's available surface
+					bool surface_granted <- false;
+					ask agri_producer {
+						if (external_producers.keys contains "m² land") {
+							surface_granted <- external_producers["m² land"].producer.produce(self.name, ["m² land"::to_add_surface]);
+						} else {
+							write "ERROR: No external producer for 'm² land' configured!";
+						}
+	
 					}
-
+	
+					if (not surface_granted) {
+						write "ERROR " + to_add_surface + " m² could not be allocated to extra farms";
+						return;
+					}
+	
+					
+					list<farm> created_farms <- [];
+					write "Adding " + to_add_surface + " m2 of " + p + " farms ...";
+					create farm number: num_to_create with: [farm_type::get_farm_type_for_product(p), surface_m2::avg_surface] returns: created_farms;
+					farms_list <- farms_list + created_farms;
+	
+					// update farm data
+					total_num_farms_A <- length(farms_list);
+					total_surface_farms_A <- total_surface_farms_A + to_add_surface;
 				}
-
-				if (not surface_granted) {
-					write "ERROR " + to_add_surface + " m² could not be allocated to extra farms";
-					return;
-				}
-
-				write "Adding " + to_add_surface + " m2 of " + p + " farms ...";
-				create farm number: num_to_create with: [farm_type::get_farm_type_for_product(p), surface_m2::avg_surface] returns: created_farms;
-				farms_list <- farms_list + created_farms;
-
-				// update farm data
-				total_num_farms_A <- length(farms_list);
-				total_surface_farms_A <- total_surface_farms_A + to_add_surface;
+				
 			}
 
 		}
@@ -545,7 +547,6 @@ species agricultural parent: bloc {
 		//map<string, float> products_stock <- ["kg_meat":: 1.4 * 1e8, "kg_vegetables"::2.0 * 1e9, "kg_cotton"::50000.0 * 1e3];
 		map<string, float> products_stock <- ["kg_meat"::0.0, "kg_vegetables"::0.0, "kg_cotton"::0.0];
 		map<string, float> perish_rate <- ["kg_meat"::0.05, "kg_vegetables"::0.08]; //choix arbitraire
-		//map<string, float> cotton_buyers <- []; // Track cotton purchases by buyer
 
 
 		//map<string, float> surface_used <- ["kg_meat":: 0.0, "kg_vegetables"::0.0, "kg_cotton"::0.0];
@@ -572,11 +573,6 @@ species agricultural parent: bloc {
 		map<string, float> get_tick_waste {
 			return tick_waste;
 		}
-
-//		map<string, float> get_cotton_buyers {
-//			write " Cotton_buyers " + cotton_buyers;
-//			return copy(cotton_buyers);
-//		}
 
 		action set_supplier (string product, bloc bloc_agent) {
 			write name + ": external producer " + bloc_agent + " set for " + product;
@@ -622,13 +618,13 @@ species agricultural parent: bloc {
 					products_stock[c] <- products_stock[c] - demand[c];
 					
 					// Track cotton sales by buyer
-					if (c = "kg_cotton") {
+					if (c = "kg_cotton" and demand[c] > 0.0) {
 						if (cotton_buyers_A.keys contains buyer) {
 							cotton_buyers_A[buyer] <- cotton_buyers_A[buyer] + demand[c];
 						} else {
 							cotton_buyers_A[buyer] <- demand[c];
 						}
-						//write "***** Coton buyer log :" + cotton_buyers;
+						write "***** Coton buyer log :" + cotton_buyers_A;
 					}
 				} else {
 					ok <- false;
@@ -651,7 +647,7 @@ species agricultural parent: bloc {
 							if not available {
 							// TODO implement partial availability (penurie case)
 								quota_received <- 0.0;
-								//write "PRODUCTION : Farm " + name + " " + farm_type + " cannot get " + ressource + " for " + product;
+								write "PRODUCTION : Farm " + name + " " + farm_type + " cannot get " + ressource + " for " + product;
 							} else {
 								myself.tick_resources_used[ressource] <- myself.tick_resources_used[ressource] + qty_needed;
 							}
@@ -779,8 +775,8 @@ species farm {
 		}
 
 		if (farm_type = "mixed") {
-			production_capacity["kg_meat"] <- surface_m2 * 0.9 * kg_per_m2["kg_meat"];
-			production_capacity["kg_vegetables"] <- surface_m2 * 0.1 * kg_per_m2["kg_vegetables"];
+			production_capacity["kg_meat"] <- surface_m2 * 0.7 * kg_per_m2["kg_meat"];
+			production_capacity["kg_vegetables"] <- surface_m2 * 0.3 * kg_per_m2["kg_vegetables"];
 		}
 
 	}
@@ -866,14 +862,13 @@ experiment run_agricultural type: gui {
 
 		}
 
-//		display Cotton_Buyers type: 2d{
-//			chart "Cotton Buyers Proportion" type: pie size: {1.0, 1.0} {
-//				loop buyer over: cotton_buyers_A.keys {
-//					data buyer value: cotton_buyers_A[buyer];
-//				}
-//				write "***** CHART " + cotton_buyers_A;
-//			}
-//		}
+		display Cotton_Buyers type: 2d{
+			chart "Cotton Buyers Proportion" type: series size: {1.0, 1.0} {
+				loop buyer over: cotton_buyers_A.keys {
+					data buyer value: cotton_buyers_A[buyer];
+				}
+			}
+		}
 
 		display Other_information {
 			chart "Population size evolution" type: series size: {0.5, 0.5} position: {0, 0} {
