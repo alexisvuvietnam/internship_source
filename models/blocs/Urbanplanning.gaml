@@ -98,7 +98,7 @@ species urbanplanning parent: bloc {
 		}
 
 		loop c over: mini_cities {
-			write c.building_supply;
+		//			write c.building_supply;
 		}
 
 		create urban_producer number: 1 returns: producers;
@@ -109,7 +109,7 @@ species urbanplanning parent: bloc {
 
 	action tick (list<human> pop) {
 		ask residents {
-			write "*** Liste des mini-villes de residents dans urban : " + self.mini_cities;
+		//			write "*** Liste des mini-villes de residents dans urban : " + self.mini_cities;
 			myself.mini_cities <- self.mini_cities;
 		}
 
@@ -119,7 +119,7 @@ species urbanplanning parent: bloc {
 			write "*** Erreur liste de mini-villes récupérée dans le tick d'urbanisme vide : " + mini_cities;
 		}
 
-		write "*** Nouvelle valeur pour mini_cities dans Urban : " + mini_cities;
+		//		write "*** Nouvelle valeur pour mini_cities dans Urban : " + mini_cities;
 		do collect_last_tick_data();
 		//		do population_activity(pop);
 		do check_building_queue();
