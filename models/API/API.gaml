@@ -124,6 +124,7 @@ species coordinator {
 		loop b over: registered_blocs.values {
 			list<string> resources_used <- b.get_input_resources_labels();
 			loop r over: resources_used {
+				write "*** Set supplier du bloc : " + b + "***";
 				if (producers.keys contains r) { // there is a known producer for this resource/good
 					ask b.producer {
 						do set_supplier(r, myself.producers[r]); // link the external producer to the bloc needing it
