@@ -159,7 +159,7 @@ global {
 		// Other blocs can access population through mini_cities or total population
 		create agricultural number: 1 {
 			pop_size <- int(population_size/100);
-			prop_human <- 100;
+			prop_human <- 10000;
 		}
 
 		create energy number: 1;
