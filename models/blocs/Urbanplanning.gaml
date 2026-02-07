@@ -7,6 +7,7 @@
 model Urbanplanning
 
 import "../API/API.gaml"
+import "../blocs/Demography.gaml"
 
 global {
 /* Setup */
@@ -41,7 +42,8 @@ global {
 	map<string, float> tick_resources_used_U <- [];
 	map<string, float> tick_emissions_U <- [];
 	list<map<string, float>> production_history_U <- [];
-	list<mini_city> mini_cities <- [];
+	// list<mini_city> mini_cities <- [];
+	mini_city_demography mini_city_ex;
 
 	init { // a security added to avoid launching an experiment without the other blocs
 		if (length(coordinator) = 0) {
@@ -64,11 +66,18 @@ species urbanplanning parent: bloc {
 	urban_consumer consumer <- nil;
 	map<string, int> to_build <- [];
 	float plastic_budget <- factory_production_capacity * supplies_U["plastic_factory"];
+	list<mini_city> mini_cities <- [];
 
 	action setup {
 		list<urban_producer> producers <- [];
 		list<urban_consumer> consumers <- [];
+
+		// Récupérer les mini-villes de demography
+		//		residents demo <- first(residents);
+		//		mini_cities <- demo.mini_cities;
 		int total_mini_cities <- length(mini_cities);
+		//				write "*** Liste des mini-villes récupérées par Urban : " + mini_cities;
+
 		// verification that the number of mini-cities isnt lower than 3
 		if total_mini_cities < 3 {
 			write "ERREUR: Pas assez de mini-villes (" + total_mini_cities + "). Minimum: 3";
@@ -99,6 +108,18 @@ species urbanplanning parent: bloc {
 	}
 
 	action tick (list<human> pop) {
+		ask residents {
+			write "*** Liste des mini-villes de residents dans urban : " + self.mini_cities;
+			myself.mini_cities <- self.mini_cities;
+		}
+
+		if (length(mini_cities) > 0) {
+			mini_city_ex <- mini_cities[0];
+		} else {
+			write "*** Erreur liste de mini-villes récupérée dans le tick d'urbanisme vide : " + mini_cities;
+		}
+
+		write "*** Nouvelle valeur pour mini_cities dans Urban : " + mini_cities;
 		do collect_last_tick_data();
 		//		do population_activity(pop);
 		do check_building_queue();
@@ -190,37 +211,37 @@ species urbanplanning parent: bloc {
 
 	// TODO : pour l'instant
 	action population_activity (list<human> pop) {
-	//		ask pop { // execute the consumption behavior of the population
-	//			ask myself.urban_consumer {
-	//				do consume(myself);
-	//			}
-	//
-	//		}
-	//
-	//		plastic_budget <- factory_production_capacity * supplies_U["plastic_factory"];
-	//		ask urban_consumer { // produce the resuired quantities
-	//			ask urban_producer {
-	//			// Battiments non-individuels
-	//				loop p over: to_build.keys {
-	//					do produce([p::to_build[p]]);
-	//				}
-	//
-	//				if (plastic_budget < 0) {
-	//					plastic_budget <- 0.0;
-	//				}
-	//
-	//				to_build <- ["plastic_factory"::0];
-	//
-	//				// Battiments indiviuels
-	//				loop c over: myself.consumed.keys {
-	//					do produce([c::myself.consumed[c]]);
-	//				}
-	//				//do produce(["plastic_factory"::100]);
-	//				add get_tick_demand() to: production_history_U;
-	//				//production_history_U <- production_history_U + get_tick_demand();
-	//			}
-	//
-	//		}
+		ask pop { // execute the consumption behavior of the population
+			ask myself.urban_consumer {
+				do consume(myself);
+			}
+
+		}
+
+		plastic_budget <- factory_production_capacity * supplies_U["plastic_factory"];
+		ask urban_consumer { // produce the resuired quantities
+			ask urban_producer {
+			// Battiments non-individuels
+				loop p over: to_build.keys {
+					do produce(self.name, [p::to_build[p]]);
+				}
+
+				if (plastic_budget < 0) {
+					plastic_budget <- 0.0;
+				}
+
+				to_build <- ["plastic_factory"::0];
+
+				// Battiments indiviuels
+				loop c over: myself.consumed.keys {
+					do produce(self.name, [c::myself.consumed[c]]);
+				}
+				//do produce(["plastic_factory"::100]);
+				add get_tick_demand() to: production_history_U;
+				//production_history_U <- production_history_U + get_tick_demand();
+			}
+
+		}
 
 	}
 
@@ -569,7 +590,7 @@ experiment run_urban type: gui {
 	}
 
 	output {
-		display Urban_information {
+		display Urban_information type: 2d {
 			chart "Population direct consumption" type: series size: {0.5, 0.5} position: {0, 0} {
 				loop c over: production_outputs_U {
 					data c value: tick_pop_consumption_U[c]; // note : products consumed by other blocs NOT included here (only population direct consumption)
@@ -604,6 +625,7 @@ experiment run_urban type: gui {
 
 		}
 
+		monitor "Mini-ville exemple" value: mini_city_ex.individuals;
 	}
 
 }

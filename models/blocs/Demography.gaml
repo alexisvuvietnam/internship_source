@@ -73,19 +73,17 @@ species residents parent: bloc {
 	list<string> population_needs <- ["kg_meat", "L water", "kg_vegetables"];
 
 	// Liste de toutes les mini-villes
+	list<mini_city> mini_cities_urban <- [];
 	list<mini_city_demography> mini_cities <- [];
 
-	// Producteur pour accéder aux ressources des autres blocs
-	demo_producer producer;
+	init {
+		create mini_city_demography number: nb_mini_cities;
+	}
 
 	/* setup the resident agent : initialize the population */
 	action setup {
 
-	// Initialisation du producer
-		create demo_producer number: 1 returns: producers;
-		producer <- first(producers);
-
-		// Initialisation des mini-villes
+	// Initialisation des mini-villes
 		write "Population totale = " + total_population;
 		write "Nombre de mini-villes = " + nb_mini_cities;
 		nb_ind_per_mini_city <- int(total_population / nb_mini_cities);
@@ -98,7 +96,7 @@ species residents parent: bloc {
 
 	/* Initialisation des mini-villes */
 	action init_mini_cities {
-		create mini_city_demography number: nb_mini_cities {
+		ask mini_city_demography {
 		// write "Nombre d'individus par mini-ville dans init_mini_cities " + myself.nb_ind_per_mini_city;
 			self.nb_individuals <- myself.nb_ind_per_mini_city;
 			do init_population;
@@ -135,6 +133,9 @@ species residents parent: bloc {
 
 				// Capture les besoins en légumes
 				total_vegetables_need <- total_vegetables_need + self.population_vegetables_need();
+
+				// Mettre à jour la population
+				self.pop <- length(self.individuals) * self.factor_individuals;
 			}
 
 			do update_births;
@@ -145,7 +146,7 @@ species residents parent: bloc {
 	}
 
 	list<string> get_input_resources_labels {
-		return population_needs;
+		return [];
 	}
 
 	list<string> get_output_resources_labels {
@@ -221,44 +222,6 @@ species residents parent: bloc {
 				ticks_before_birthday <- ticks_before_birthday - 1;
 			}
 
-		}
-
-	}
-
-	/**
-	 * Le bloc demography ne produit rien, mais on en a besoin pour récupérer les ressources des autres blocs
-	  */
-	species demo_producer parent: production_agent {
-		map<string, bloc> external_producers; // external producers that provide the needed resources
-		init {
-			external_producers <- []; // external producers that provide the needed resources
-		}
-
-		/* Produce the given resources in the requested quantities. Return true in case of success. 
-		 * buyer est l'entité qui demande, demand est un couple <ressource, quantité>. */
-		bool produce (string buyer, map<string, float> demand) {
-			return true;
-		}
-
-		/* Returns all the resources used for the production this tick */
-		map<string, float> get_tick_inputs_used {
-			return; // Pas utilisé par démographie
-		}
-
-		/* Returns the amounts produced this tick */
-		map<string, float> get_tick_outputs_produced {
-			return;
-		}
-
-		/* Returns the amounts emitted this tick */
-		map<string, float> get_tick_emissions {
-			return;
-		}
-
-		/* Defines an external producer for a resource */
-		action set_supplier (string product, bloc bloc_agent) {
-			write name + ": external producer " + bloc_agent + " set for " + product;
-			external_producers[product] <- bloc_agent;
 		}
 
 	}
