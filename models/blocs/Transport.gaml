@@ -1088,7 +1088,7 @@ species transport_mode {
 	        km_age <- old_total_km / number_available;
 	
 	        //write type + ": Added " + to_add + " new vehicles. Total: " + number_available + ", New avg km_age: " + km_age;
-	        write type + " : " + to_add;
+	        //write type + " : " + to_add;
 	    }
 	
 	    if (number_available > 1 and km_travelled > 0) {
@@ -1277,15 +1277,22 @@ experiment run_transport type: gui {
 	output {
 		display Transport_information type: 2d{
 			chart "Energy consumption by mode" type: series size: {0.5,0.5} position: {0, 0.5} {
-			    loop mode over: transport_name {
-	    			data mode value: tick_trip_energy[mode];
-	    		}
-			    data "total" value: tick_resources_used_T["kWh energy"];
+				data "trip_minibus" value: tick_trip_energy["trip_minibus"] color: #red;
+				data "trip_tgv" value: tick_trip_energy["trip_tgv"] color: #blue;
+				data "trip_ter" value: tick_trip_energy["trip_ter"] color: #green;
+				data "trip_taxi" value: tick_trip_energy["trip_taxi"] color: #yellow;
+			    //loop mode over: transport_name {
+	    			//data mode value: tick_trip_energy[mode];
+	    		//}
+			    data "total" value: tick_resources_used_T["kWh energy"] color: #pink;
 			}
 			chart "Number of long trips by mode" type: series size: {0.5,0.5} position: {0, 0} {
-	    		loop mode over: long_transport {
-	    			data mode value: tick_long_trips[mode];
-	    		}
+				data "trip_tgv" value: tick_long_trips["trip_tgv"] color: #blue;
+				data "trip_ter" value: tick_long_trips["trip_ter"] color: #green;
+				data "trip_taxi" value: tick_long_trips["trip_taxi"] color: #yellow;
+	    		//loop mode over: long_transport {
+	    			//data mode value: tick_long_trips[mode];
+	    		//}
 	    	}
 //	    	chart "Number of short trips by mode" type: series size: {0.5,0.5} position: {0.5, 0} {
 //	    		loop mode over: short_transport {
@@ -1294,7 +1301,7 @@ experiment run_transport type: gui {
 //	    	}
 	    	chart "Production emissions" type: series size: {0.5,0.5} position: {0.5, 0.5} {
 	    		loop e over: production_emissions_T{
-	    			data e value: tick_emissions_T[e];
+	    			data e value: tick_emissions_T[e] color: #black;
 	    		}
 			}
 			/*
@@ -1311,9 +1318,14 @@ experiment run_transport type: gui {
 //			    }
 //			}
 			chart "Total production" type: series  size: {0.5,0.5} position: {0.5, 0} {
-			    loop c over: production_outputs_T{
-			    	data c value: tick_production_T[c];
-			    }
+				data "minibus" value: tick_production_T["minibus"] color: #red;
+				data "tgv" value: tick_production_T["tgv"] color: #blue;
+				data "ter" value: tick_production_T["ter"] color: #green;
+				data "taxi" value: tick_production_T["taxi"] color: #yellow;
+				data "truck" value: tick_production_T["truck"] color: #purple;
+			    //loop c over: production_outputs_T{
+			    	//data c value: tick_production_T[c];
+			    //}
 			}
 	    }
 	}
