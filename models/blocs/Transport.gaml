@@ -454,7 +454,7 @@ species transport parent: bloc {
 
 		}
 
-	bool produce(map<string,float> demand) {
+	bool produce(string buyer, map<string,float> demand) {
 	    bool ok_trips <- true;
 	    
 	    // fabrication
@@ -466,7 +466,7 @@ species transport parent: bloc {
 	                
 	                if (external_producers.keys contains u) {
 	                    // demande 
-	                    bool av <- external_producers[u].producer.produce([u::qty]);
+	                    bool av <- external_producers[u].producer.produce(buyer, [u::qty]);
 	                    if not av { write "/!\\ ÉCHEC CRITIQUE FABRICATION : " + c; }
 	                }
 	                tick_emissions["gCO2e emissions"] <- tick_emissions["gCO2e emissions"] + qty * production_output_emissions_T[c]["gCO2e emissions"];
@@ -481,7 +481,7 @@ species transport parent: bloc {
 	            loop u over: production_inputs_T {
 	                float qty_trip <- tick_trip_energy[c];
 	                if (external_producers.keys contains u) {
-	                    bool av <- external_producers[u].producer.produce([u::qty_trip]);
+	                    bool av <- external_producers[u].producer.produce(buyer, [u::qty_trip]);
 	                    if not av {
 	                        ok_trips <- false;
 	                        if (do_long_trips) { do_long_trips <- false; } 
@@ -1080,7 +1080,7 @@ species transport_mode {
 		
 	    if (to_add > 0 and parent_transport != nil and parent_transport.producer != nil) {
 	        ask parent_transport.producer {
-	            do produce([product_name :: float(to_add)]);
+	            do produce(name, [product_name :: float(to_add)]);
 	        }
 	        
 	        float old_total_km <- km_age * number_available;
