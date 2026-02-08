@@ -349,7 +349,8 @@ species transport parent: bloc {
 	action population_activity (list<human> pop) {
 	// calculate trip numbers based on population
 	// TODO : modify to get the population from demography
-		int nb_population <- 66352000; // population statique
+		int nb_population <- length(pop) * 10000; 
+		
 		float nb_weeks_per_month <- 4.34524;
 		int long_trips <- int(nb_population * (nb_weeks_per_month * long_trips_per_week));
 		int short_trips <- int(nb_population * (nb_weeks_per_month * short_trips_per_week));
