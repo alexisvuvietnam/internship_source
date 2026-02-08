@@ -23,9 +23,8 @@ global {
 	/* Le stock des différentes ressources naturelles à l'initialisation (cad la France de 2022) */
 	float stock_wood <- 3100000000.0; // 3,1 millards de m3 de bois
 	float stock_meat <- 150.0 * 1000000.0; // 1 million de sangliers de 150kg
-	// Stock d'eau renouvelable : basé sur les précipitations annuelles (~440 milliards m3/an)
-	// Convertir en litres et prendre une part utilisable (environ 20% après évapotranspiration)
-	float stock_water <- 88e12; // 88 000 milliards de litres (stock annuel renouvelable utilisable)
+	// Stock d'eau renouvelable : 211 milliards de m3/an, converti en litres
+	float stock_water <- 211e12; // 211 000 milliards de litres (remis à zéro chaque année)
 	map<string, float> used_water <- []; // Consommation d'eau pour chaque secteur
 
 	/* Gestion de la surface */
@@ -37,10 +36,8 @@ global {
 
 	/* Production annuelle convertie en production mensuelle*/
 	float prod_wood <- 87800000 / 12; //environ 7 millions de m3
-	float prod_meat <- 900000 * 150.0 / 12; // Un sanglier européen pèse environ 150 kg
-	// Production d'eau par mois (recharge via précipitations et infiltration)
-	// Environ 440 milliards m3/an de précipitations, 20% utilisable = 88 milliards m3/an
-	float prod_water <- (88e12) / 12; // environ 7 300 milliards de litres par mois
+//	float prod_meat <- 900000 * 150.0 / 12; // Un sanglier européen pèse environ 150 kg
+	int month_counter <- 12;
 
 	/* GES absorbé par mois (en moyenne période 2007 à 2020) */
 	float GES_absorbe_per_tick <- 8.3e10; // 83 000 tonnes par mois (ici en grammes)
@@ -94,8 +91,11 @@ species environnement parent: bloc {
 	action natural_regeneration {
 	/* Mise à jour des stocks */
 		stock_wood <- stock_wood + prod_wood;
-		stock_meat <- stock_meat + prod_meat;
-		stock_water <- stock_water + prod_water; // recharge mensuelle en eau
+//		stock_meat <- stock_meat + prod_meat;
+		// Tous les 12 ticks (1 an), le stock d'eau revient à 211 milliards de m3 (en L)
+		if (mod(cycle, 12) = 0) {
+			stock_water <- 211e12;
+		}
 	}
 
 	action collect_last_tick_data {
@@ -132,13 +132,13 @@ species environnement parent: bloc {
 
 		/******** INITIALISATION DU PRODUCTEUR ********/
 		init {
-			tick_production <- ["m3_wood"::0.0, "L water"::0.0, "kg_meat"::0.0];
+			tick_production <- ["m3_wood"::0.0, "L water"::0.0];
 			tick_emissions["gCO2e emissions"] <- 0.0;
 		}
 
 		/******** RESET DES COMPTEURS POUR LE NOUVEAU TICK ********/
 		action reset_tick_counters {
-			tick_production <- ["m3_wood"::0.0, "L water"::0.0, "kg_meat"::0.0, "m² land"::0.0];
+			tick_production <- ["m3_wood"::0.0, "L water"::0.0, "m² land"::0.0];
 			tick_emissions <- ["gCO2e emissions"::0.0];
 		}
 
@@ -161,16 +161,16 @@ species environnement parent: bloc {
 
 				}
 
-				/* Production de viande */
-				if (r = "kg_meat") {
-					if (stock_meat >= qty) {
-						stock_meat <- stock_meat - qty;
-						tick_production[r] <- tick_production[r] + qty;
-					} else {
-						return false; // stock insuffisant
-					}
-
-				}
+//				/* Production de viande */
+//				if (r = "kg_meat") {
+//					if (stock_meat >= qty) {
+//						stock_meat <- stock_meat - qty;
+//						tick_production[r] <- tick_production[r] + qty;
+//					} else {
+//						return false; // stock insuffisant
+//					}
+//
+//				}
 
 				/* Production d’eau */
 				if (r = "L water") {
@@ -253,9 +253,9 @@ experiment run_ecosystem type: gui {
 				data "Stock de bois" value: stock_wood color: #brown;
 			}
 
-			chart "Évolution du stock du nombre de gibiers" type: series size: {0.5, 0.5} position: {0, 0.5} {
-				data "Stock de gibier (sangliers)" value: stock_meat / 150.0 color: #darkred;
-			}
+//			chart "Évolution du stock du nombre de gibiers" type: series size: {0.5, 0.5} position: {0, 0.5} {
+//				data "Stock de gibier (sangliers)" value: stock_meat / 150.0 color: #darkred;
+//			}
 
 			chart "Évolution du stock d'eau (en milliards L)" type: series size: {0.5, 0.5} position: {0.5, 0} {
 				data "Stock d'eau" value: stock_water / 1e9 color: #blue;
@@ -290,9 +290,9 @@ experiment run_ecosystem type: gui {
 				data "Bois" value: tick_production_ECO["m3_wood"] color: #brown;
 			}
 
-			chart "Quantité d'utilisation de viande à chaque tick" type: series size: {0.5, 0.5} position: {0, 0.5} {
-				data "Viande" value: tick_production_ECO["kg_meat"] color: #darkred;
-			}
+//			chart "Quantité d'utilisation de viande à chaque tick" type: series size: {0.5, 0.5} position: {0, 0.5} {
+//				data "Viande" value: tick_production_ECO["kg_meat"] color: #darkred;
+//			}
 
 			chart "Quantité d'utilisation d'eau à chaque tick" type: series size: {0.5, 0.5} position: {0.5, 0} {
 			// data "Eau" value: tick_production_ECO["L water"] color: #aqua;
