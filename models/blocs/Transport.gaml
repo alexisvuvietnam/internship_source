@@ -47,11 +47,11 @@ global {
 	// renouvelement des véhicule
 	int r_m <- 1;
 	map<string,int> production_vehicules <- [
-	    "taxi"::1500*r_m,       // 2,000 per month (~24k/year)
-	    "tgv"::25*r_m,           // ~1 per month (~12/year)
-	    "ter"::650*r_m,           // ~7 per month (~84/year)
-	    "minibus"::5500*r_m,      // ~5760 per month
-	    "bike"::400*r_m        // 400 per month
+	    "taxi"::20*r_m,
+	    "tgv"::0*r_m,
+	    "ter"::5*r_m,
+	    "minibus"::130*r_m,
+	    "bike"::10*r_m
 	];
 	
 	
@@ -349,7 +349,7 @@ species transport parent: bloc {
 	action population_activity (list<human> pop) {
 	// calculate trip numbers based on population
 	// TODO : modify to get the population from demography
-		int nb_population <- length(pop) * 10000; 
+		int nb_population <- length(pop) * 100; 
 		
 		float nb_weeks_per_month <- 4.34524;
 		int long_trips <- int(nb_population * (nb_weeks_per_month * long_trips_per_week));
@@ -1112,8 +1112,8 @@ species taxis parent: transport_mode {
 
 	init {
 		type <- "taxis";
-		// number_available <- 45000;
-		number_available <- 1314590;
+		number_available <- 45000;
+		// number_available <- 1314590;
 		create taxi_vehicle number:1;
 		ref_vehicle <- first(taxi_vehicle);
 		max_trips_per_tick <- vehicle_max_trips["taxi"];
@@ -1129,8 +1129,8 @@ species tgvs parent: transport_mode {
 
 	init {
 		type <- "tgvs";
-		// number_available <- 450;
-		number_available <- 298;
+		number_available <- 450;
+		//number_available <- 298;
 		create tgv_vehicle number:1;
 		ref_vehicle <- first(tgv_vehicle);
 		max_trips_per_tick <- vehicle_max_trips["tgv"];
@@ -1146,8 +1146,8 @@ species ters parent: transport_mode {
 
 	init {
 		type <- "ters";
-		// number_available <- 2500;
-		number_available <- 8805;
+		number_available <- 2500;
+		// number_available <- 8805;
 		create ter_vehicle;
 		ref_vehicle <- first(ter_vehicle);
 		max_trips_per_tick <- vehicle_max_trips["ter"];
@@ -1163,8 +1163,8 @@ species minibuses parent: transport_mode {
 
 	init {
 		type <- "minibuses";
-		// number_available <- 28000;
-		number_available <- 52642;
+		number_available <- 28000;
+		//number_available <- 52642;
 		create minibus_vehicle;
 		ref_vehicle <- first(minibus_vehicle);
 		max_trips_per_tick <- vehicle_max_trips["minibus"];
@@ -1180,8 +1180,8 @@ species bikes parent: transport_mode {
 
 	init {
 		type <- "bikes";
-		// number_available <- 3500000;
-		number_available <- 48044;
+		number_available <- 3500000;
+		// number_available <- 48044;
 		create bike_vehicle number:1;
 		ref_vehicle <- first(bike_vehicle);
 		max_trips_per_tick <- vehicle_max_trips["bike"];
@@ -1282,19 +1282,22 @@ experiment run_transport type: gui {
 	    		//}
 			    data "total" value: tick_resources_used_T["kWh energy"] color: #pink;
 			}
-			chart "Number of long trips by mode" type: series size: {0.5,0.5} position: {0, 0} {
-				data "trip_tgv" value: tick_long_trips["trip_tgv"] color: #blue;
-				data "trip_ter" value: tick_long_trips["trip_ter"] color: #green;
-				data "trip_taxi" value: tick_long_trips["trip_taxi"] color: #yellow;
-	    		//loop mode over: long_transport {
-	    			//data mode value: tick_long_trips[mode];
-	    		//}
-	    	}
-//	    	chart "Number of short trips by mode" type: series size: {0.5,0.5} position: {0.5, 0} {
+//			chart "Number of long trips by mode" type: series size: {0.5,0.5} position: {0, 0} {
+//				data "trip_tgv" value: tick_long_trips["trip_tgv"] color: #blue;
+//				data "trip_ter" value: tick_long_trips["trip_ter"] color: #green;
+//				data "trip_taxi" value: tick_long_trips["trip_taxi"] color: #yellow;
+//	    		//loop mode over: long_transport {
+//	    			//data mode value: tick_long_trips[mode];
+//	    		//}
+//	    	}
+	    	chart "Number of short trips by mode" type: series size: {0.5,0.5} position: {0, 0} {
+	    		data "trip_minibus" value: tick_short_trips["trip_minibus"] color:#red;
+	    		data "trip_bike" value: tick_short_trips["trip_bike"] color:#lightblue;
+	    		data "trip_walking" value: tick_short_trips["trip_walking"] color:#lightgreen;
 //	    		loop mode over: short_transport {
 //	    			data mode value: tick_short_trips[mode];
 //	    		}
-//	    	}
+	    	}
 	    	chart "Production emissions" type: series size: {0.5,0.5} position: {0.5, 0.5} {
 	    		loop e over: production_emissions_T{
 	    			data e value: tick_emissions_T[e] color: #black;
