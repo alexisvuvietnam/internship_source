@@ -21,6 +21,15 @@ class BinaryDecision:
             utility += self.weights[i] * self.data[alternative][self.viewpoints[i]]
         return utility
     
+    def getConditionalUtility(self, N, alternative):
+        assert (alternative in self.alternatives), "This alternative is not valid."
+        utility = 0
+        for viewpoint in N:
+            i = self.viewpoints.index(viewpoint)
+            utility += self.weights[i] * self.data[alternative][viewpoint]
+        return utility
+
+    
     def preference(self, x, y):
         assert ((x in self.alternatives) and (y in self.alternatives)), "These alternatives are not valid."
         return self.getUtility(x) >= self.getUtility(y)
@@ -50,3 +59,17 @@ class BinaryDecision:
             for C in tmp2:
                 contextualized.append((P, C))
         return contextualized
+    
+    def trade_offs_disjointment(self, to1, to2):
+        P1, C1 = to1
+        P2, C2 = to2
+        return P1.isdisjoint(P2) and C1.isdisjoint(C2)
+    
+    def trade_offs_alignment(self, to, x, y):
+        P, C = to
+        N = P | C
+        return self.getConditionalUtility(N, x) >= self.getConditionalUtility(N, y)
+
+class Solver:
+    def __init__(self):
+        pass
