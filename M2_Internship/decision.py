@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+import itertools
 from typing import List, Set
 
 class BinaryDecision:
@@ -23,3 +24,29 @@ class BinaryDecision:
     def preference(self, x, y):
         assert ((x in self.alternatives) and (y in self.alternatives)), "These alternatives are not valid."
         return self.getUtility(x) >= self.getUtility(y)
+    
+    def orientation(self, x, y):
+        assert ((x in self.alternatives) and (y in self.alternatives)), "These alternatives are not valid."
+        pros = set()
+        cons = set()
+        neutral = set()
+        for viewpoint in self.viewpoints:
+            if self.data[x][viewpoint] > self.data[y][viewpoint]:
+                pros.add(viewpoint)
+            elif self.data[x][viewpoint] < self.data[y][viewpoint]:
+                cons.add(viewpoint)
+            else:
+                neutral.add(viewpoint)
+        return pros, cons, neutral
+    
+    def trade_offs(self, np, nc, x, y):
+        assert ((x in self.alternatives) and (y in self.alternatives)), "These alternatives are not valid."
+        assert ((np >= 0) and (nc >= 0) and (x + y <= self.size)), "These parameters are not valid."
+        pros, cons, _ = self.orientation(x, y)
+        contextualized = list()
+        tmp1 = itertools.combinations(pros, np)
+        tmp2 = itertools.combinations(cons, nc)
+        for P in tmp1:
+            for C in tmp2:
+                contextualized.append((P, C))
+        return contextualized
